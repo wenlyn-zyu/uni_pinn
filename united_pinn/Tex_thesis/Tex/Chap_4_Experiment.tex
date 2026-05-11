@@ -1,6 +1,6 @@
 \chapter{实验}\label{chap:experiment}
 
-本章报告统一PINN框架的实验结果，包括训练过程分析、精度评估、推断速度对比、LLM路由层的准确率测试，以及基于真实SPY期权市场数据的模型对比验证。
+本章报告统一PINN框架的实验结果，包括训练过程分析、精度评估、推断速度、LLM路由层的准确率测试、消融实验，以及基于真实SPY期权市场数据的模型对比验证。
 
 \section{实验设置}\label{sec:exp_setup}
 
@@ -51,9 +51,9 @@
     初始学习率 & $10^{-3}$ \\
     学习率衰减 & 余弦退火（$\eta_\text{min}=10^{-5}$） \\
     训练步数 & 30000 \\
-    每步配点数$N_c$ & 每模型512点（共26624） \\
+    每步配点数$N_c$ & 每模型512点 \\
     边界点数$N_b$ & 每模型500点 \\
-    数据锚点数$N_d$ & 每模型20点（共1040） \\
+    数据锚点数$N_d$ & 每模型20点 \\
     损失权重$(w_\text{pde}, w_\text{bc}, w_\text{data})$ & $(1, 10, 100)$ \\
     \hline
   \end{tabular}
@@ -101,13 +101,13 @@
     模型 & MAE & RMSE & RelMAE$_\text{ATM}$ \\
     \hline
     BSM & 0.0213 & 0.0260 & 0.21\% \\
-    CEV ($\beta=0.5$) & 0.0646 & 0.1065 & 0.81\% \\
+    CEV ($\beta=0.5$) & 0.065 & 0.107 & 0.81\% \\
     Heston & 0.0337 & 0.0470 & 0.38\% \\
     \hline
   \end{tabular}
 \end{table}
 
-三大模型的ATM相对误差均低于1\%，达到实用精度。v15版本相比早期版本有显著改善：BSM的MAE从0.067降至0.021（降幅68\%），主要得益于训练参数覆盖了更广泛的$\sigma$范围（$\sigma\in[0.13,0.30]$）；CEV的ATM相对误差从37.95\%降至0.81\%，说明扩大参数范围后网络对CEV的拟合质量显著提升；Heston的MAE为0.034，与早期版本（0.031）相当，ATM相对误差0.38\%。
+三大模型的ATM相对误差均低于1\%，达到实用精度。v15版本相比早期版本有显著改善：BSM的MAE从0.067降至0.021（降幅68\%），主要得益于训练参数覆盖了更广泛的$\sigma$范围（$\sigma\in[0.13,0.30]$）；CEV的ATM相对误差从37.95\%降至0.81\%，说明扩大参数范围后网络对CEV的拟合质量显著提升；Heston的MAE为0.034，ATM相对误差0.38\%。
 
 \subsection{价格曲线对比}
 
@@ -135,81 +135,13 @@
 
 误差分布呈现出典型的"U形"特征：ATM区域误差最小，深度虚值和深度实值区域误差较大。这与PINN的训练策略一致：均匀采样的配点在ATM区域密度较高（因为$S\in[0,300]$的均匀采样中，$[80,120]$区间占比约13\%），而深度虚值/实值区域的配点密度相对较低。
 
-\section{推断速度对比}\label{sec:speed}
+\section{推断速度}\label{sec:speed}
 
-表~\ref{tab:speed}报告了不同方法的推断速度对比（单次定价，CPU推断）。
-
-\begin{table}[htbp]
-  \centering
-  \caption{不同期权定价方法的推断速度对比}
-  \label{tab:speed}
-  \begin{tabular}{lcc}
-    \hline
-    方法 & 推断时间 & 备注 \\
-    \hline
-    BSM解析公式 & $<0.1$ms & 仅适用于BSM \\
-    有限差分法（BSM） & $\approx 50$ms & 网格$200\times 200$ \\
-    有限差分法（Heston） & $\approx 500$ms & 网格$200\times 200\times 200$ \\
-    蒙特卡洛（Heston） & $\approx 2000$ms & $10^5$路径 \\
-    统一PINN（GPU） & $\approx 2$ms & 三种模型统一推断 \\
-    统一PINN（CPU） & $\approx 8$ms & 三种模型统一推断 \\
-    \hline
-  \end{tabular}
-\end{table}
-
-统一PINN的推断速度（GPU约2ms，CPU约8ms）显著优于有限差分法和蒙特卡洛方法，与BSM解析公式相比仅慢约20倍，但能够同时支持三种模型，且无需针对不同参数重新计算。
+统一PINN的推断速度在GPU上约为2ms，CPU上约为8ms（单次定价，批量输入），能够同时支持三种模型，无需针对不同参数重新计算。
 
 \section{LLM路由层评估}\label{sec:llm_eval}
 
-\subsection{测试用例设计}
-
-设计了20个测试用例，覆盖三种模型和中英文输入，如表~\ref{tab:llm_test}所示（部分示例）。
-
-\begin{table}[htbp]
-  \centering
-  \caption{LLM路由层测试用例示例}
-  \label{tab:llm_test}
-  \begin{tabular}{p{7cm}cc}
-    \hline
-    用户输入 & 预期模型 & 实际模型 \\
-    \hline
-    "欧式看涨期权，S=100, K=100, T=1, r=0.05, sigma=0.2" & BSM & BSM \\
-    "European call, S=120, K=100, T=0.5, r=0.03, sigma=0.25" & BSM & BSM \\
-    "CEV模型，beta=0.5，S=100, K=100, T=1, r=0.05, sigma=0.2" & CEV & CEV \\
-    "Heston随机波动率，kappa=2, theta=0.04, xi=0.3, rho=-0.7, v0=0.04" & Heston & Heston \\
-    "stochastic volatility option, S=100, K=100, T=1" & Heston & Heston \\
-    "期权定价，S=100, K=100" & BSM & BSM \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{路由准确率}
-
-在20个测试用例上，LLM路由层实现了\textbf{100\%的模型选择准确率}（20/20）。参数提取的准确率同样为100\%：所有数值参数均被正确提取，缺失参数均使用了合理的默认值。
-
-LLM路由层的主要优势体现在三个方面：鲁棒性方面，对中英文混合输入、参数顺序不同、参数名称变体（如"vol-of-vol"、"波动率的波动率"、"xi"均被正确识别为$\xi$）均能正确处理；默认值处理方面，当用户未提供某些参数时，LLM能够根据上下文选择合理的默认值，而非报错；模型推断方面，当用户未明确指定模型但提供了特定参数（如$\kappa,\theta,\xi,\rho$）时，LLM能够正确推断应使用Heston模型。
-
-\subsection{端到端定价示例}
-
-以下展示一个完整的端到端定价示例：
-
-\textbf{用户输入}（中文）：
-\begin{quote}
-"我想对一个欧式看涨期权定价，标的资产当前价格100元，执行价100元，到期时间1年，无风险利率5\%，使用Heston随机波动率模型，均值回归速度2，长期方差0.04，波动率的波动率0.3，相关系数-0.7，初始方差0.04。"
-\end{quote}
-
-\textbf{LLM提取的参数}：
-\begin{verbatim}
-{
-  "model": "Heston",
-  "option_type": "call",
-  "S": 100.0, "K": 100.0, "T": 1.0, "r": 0.05,
-  "kappa": 2.0, "theta": 0.04, "xi": 0.3,
-  "rho": -0.7, "v0": 0.04
-}
-\end{verbatim}
-
-\textbf{统一PINN输出}：期权价格 = \textbf{6.8432}（参考解：6.8721，相对误差0.42\%）
+设计了20个测试用例，覆盖三种模型和中英文输入，LLM路由层实现了100\%的模型选择准确率（20/20），所有数值参数均被正确提取，缺失参数均使用了合理的默认值。路由层对中英文混合输入、参数顺序不同、参数名称变体（如"vol-of-vol"、"波动率的波动率"、"xi"均被正确识别为$\xi$）均能正确处理，当用户未明确指定模型但提供了特定参数（如$\kappa,\theta,\xi,\rho$）时，LLM能够正确推断应使用Heston模型。
 
 \section{消融实验}\label{sec:ablation}
 
