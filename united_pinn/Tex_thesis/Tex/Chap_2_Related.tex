@@ -4,7 +4,7 @@
 
 \section{期权定价模型}\label{sec:option_models}
 
-期权定价的核心问题是在给定标的资产动态假设下，求解期权价值所满足的偏微分方程（PDE）。
+期权定价的核心问题是在给定标的资产动态假设下，求解期权价值所满足的偏微分方程（PDE）。期权定价理论的发展历程体现了从简单到复杂、从单因子到多因子的演进路径。
 
 \subsection{Black-Scholes-Merton模型}
 
@@ -12,18 +12,20 @@ Black、Scholes与Merton于1973年提出了期权定价的奠基性框架\cite{b
 \begin{equation}
   dS = \mu S\,dt + \sigma S\,dW_t,
 \end{equation}
-其中$\mu$为漂移率，$\sigma$为常数波动率，$W_t$为标准布朗运动。通过无套利原理，欧式期权价值$V(S,t)$满足Black-Scholes-Merton（BSM）方程：
+其中$\mu$为漂移率，$\sigma$为常数波动率，$W_t$为标准布朗运动。通过无套利原理和Itô引理，欧式期权价值$V(S,t)$满足Black-Scholes-Merton（BSM）方程：
 \begin{equation}\label{eq:bsm}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2}
   + rS\frac{\partial V}{\partial S}
   - rV = 0,
 \end{equation}
-其中$r$为无风险利率。欧式看涨期权具有解析解（Black-Scholes公式），可作为数值方法的精确基准：
+其中$r$为无风险利率。该方程在终值条件$V(S,T)=\max(S-K,0)$（欧式看涨期权）和边界条件$V(0,t)=0$、$V(S,t)\to S$（$S\to\infty$）下具有封闭解析解（Black-Scholes公式）：
 \begin{equation}\label{eq:bs_formula}
   V_\text{BS}(S,t) = S\Phi(d_1) - Ke^{-r(T-t)}\Phi(d_2),
 \end{equation}
-其中$d_1 = \frac{\ln(S/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$，$d_2=d_1-\sigma\sqrt{T-t}$，$\Phi(\cdot)$为标准正态分布函数。BSM模型的主要局限在于假设波动率为常数，与市场中观测到的波动率微笑（volatility smile）现象不符。
+其中$d_1 = \frac{\ln(S/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$，$d_2=d_1-\sigma\sqrt{T-t}$，$\Phi(\cdot)$为标准正态累积分布函数。
+
+BSM模型的主要局限在于假设波动率为常数，与市场中观测到的波动率微笑（volatility smile）现象不符。实证研究表明，不同执行价的隐含波动率并非常数，而是呈现出"微笑"或"偏斜"形状，这说明市场对极端事件的定价高于BSM模型的预测。
 
 \subsection{常弹性方差模型}
 
@@ -31,7 +33,7 @@ Cox和Ross\cite{cox1976valuation}提出了常弹性方差（Constant Elasticity 
 \begin{equation}
   dS = \mu S\,dt + \sigma S^{\beta}\,dW_t,
 \end{equation}
-其中$\beta$为弹性参数。当$\beta=1$时退化为BSM模型；当$\beta<1$时，波动率随股价上涨而下降，能够捕捉股票市场中的杠杆效应（leverage effect）。对应的期权定价PDE为：
+其中$\beta$为弹性参数，$\sigma$为尺度参数。当$\beta=1$时退化为BSM模型；当$\beta<1$时，波动率随股价上涨而下降，能够捕捉股票市场中的杠杆效应（leverage effect）——即股价下跌时波动率上升的现象。对应的期权定价PDE为：
 \begin{equation}\label{eq:cev}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}\sigma^2 S^{2\beta} \frac{\partial^2 V}{\partial S^2}
@@ -39,6 +41,8 @@ Cox和Ross\cite{cox1976valuation}提出了常弹性方差（Constant Elasticity 
   - rV = 0.
 \end{equation}
 CEV模型一般情况下无闭合解析解，通常采用有限差分法或级数展开法求解。本文取$\beta=0.5$（平方根过程），此时扩散系数$\sigma^2 S$随股价线性增长，能够捕捉股票市场中的典型杠杆效应。
+
+CEV模型的优势在于：（1）仅引入一个额外参数$\beta$，模型复杂度低；（2）能够产生波动率偏斜，更好地拟合股票期权市场；（3）当$\beta<1$时，股价过程在$S=0$处有吸收边界，能够模拟公司破产的可能性。
 
 \subsection{Heston随机波动率模型}
 
@@ -57,7 +61,40 @@ Heston\cite{heston1993closed}提出了随机波动率模型，将波动率本身
   + \kappa(\theta-v)\frac{\partial V}{\partial v}
   - rV = 0.
 \end{equation}
-Heston模型具有半解析解（通过特征函数方法），但数值求解二维PDE的计算代价显著高于一维情形。Heston模型能够产生厚尾收益率分布，对长期期权和波动率衍生品的定价更为准确。
+Heston模型具有半解析解（通过特征函数方法和Gil-Pelaez反演），但数值求解二维PDE的计算代价显著高于一维情形。Heston模型能够产生厚尾收益率分布，对长期期权和波动率衍生品的定价更为准确。
+
+Heston模型的关键参数含义如下：
+\begin{itemize}
+  \item $\kappa$（均值回归速度）：控制方差过程回归到长期均值的速度，$\kappa$越大，方差越快回归到$\theta$；
+  \item $\theta$（长期方差）：方差过程的长期均值，决定了长期隐含波动率水平；
+  \item $\xi$（vol-of-vol）：方差过程的波动率，控制波动率微笑的曲率；
+  \item $\rho$（相关系数）：股价与方差过程的相关性，负相关（$\rho<0$）产生波动率偏斜，符合股票市场的实证特征。
+\end{itemize}
+
+Feller条件$2\kappa\theta>\xi^2$保证方差过程$v$始终为正，在实际应用中通常需要满足此条件。
+
+\subsection{三大模型的比较}
+
+表~\ref{tab:model_comparison}从多个维度比较了三大期权定价模型的特性。
+
+\begin{table}[htbp]
+  \centering
+  \caption{BSM、CEV、Heston三大期权定价模型比较}
+  \label{tab:model_comparison}
+  \begin{tabular}{lccc}
+    \hline
+    特性 & BSM & CEV & Heston \\
+    \hline
+    波动率假设 & 常数 & 局部（依赖$S$） & 随机（CIR过程） \\
+    PDE维度 & 1维 & 1维 & 2维 \\
+    解析解 & 有（封闭） & 无（级数展开） & 半解析（特征函数） \\
+    参数数量 & 2（$\sigma,r$） & 3（$\sigma,\beta,r$） & 6（$\kappa,\theta,\xi,\rho,v_0,r$） \\
+    波动率微笑 & 不能捕捉 & 部分捕捉（偏斜） & 完整捕捉（微笑+偏斜） \\
+    计算复杂度 & 低 & 中 & 高 \\
+    适用场景 & 短期、平稳市场 & 股票期权 & 指数、外汇期权 \\
+    \hline
+  \end{tabular}
+\end{table}
 
 \section{物理信息神经网络}\label{sec:pinn}
 
@@ -71,17 +108,27 @@ Heston模型具有半解析解（通过特征函数方法），但数值求解�
 \end{equation}
 其中$\mathcal{L}_{\text{pde}}$为配点处的PDE残差均方误差，$\mathcal{L}_{\text{ic}}$和$\mathcal{L}_{\text{bc}}$分别为初值条件和边界条件的拟合误差。PINN的主要优势在于无需网格剖分，天然适合高维问题，且可同时求解正问题与反问题。PDE残差通过自动微分（automatic differentiation）\cite{baydin2018automatic}精确计算，无需有限差分近似。
 
+PINN的训练过程本质上是一个约束优化问题：在满足PDE约束的前提下，最小化边界条件和初值条件的拟合误差。与传统数值方法相比，PINN的主要优势包括：
+\begin{enumerate}
+  \item \textbf{无网格}：不需要对求解域进行网格剖分，避免了维数灾难；
+  \item \textbf{参数化}：通过将模型参数作为网络输入，单个网络可以覆盖整个参数空间，无需针对不同参数重新求解；
+  \item \textbf{即时推断}：训练完成后，对任意输入的推断时间约为毫秒级，远低于传统数值方法；
+  \item \textbf{自动微分}：利用自动微分精确计算PDE残差，无需有限差分近似带来的截断误差。
+\end{enumerate}
+
+PINN的主要挑战包括：（1）损失函数中多个约束项之间的权重平衡；（2）高维问题中配点的有效采样；（3）复杂PDE（如含交叉偏导项的Heston方程）的收敛困难。
+
 \subsection{PINN在期权定价中的应用}
 
-将PINN应用于期权定价是近年来的研究热点。Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征，并与真实市场价格进行了对比验证。
+将PINN应用于期权定价是近年来的研究热点。Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征，并与真实市场价格进行了对比验证。该工作验证了PINN在期权定价中的可行性，但仅针对BSM模型，且网络结构较为复杂。
 
-Zamxaka\cite{zamxaka2023cev}在MPhil论文中系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格，无需重新训练。
+Zamxaka\cite{zamxaka2023cev}在MPhil论文中系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格，无需重新训练。该工作的参数化思路与本文的统一框架有相似之处，但仅覆盖BSM和CEV两种模型，未涉及Heston。
 
-Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格、Greeks和局部波动率曲面的同步计算，验证了PINN在一族扩展Black-Scholes方程上的通用性。
+Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格、Greeks和局部波动率曲面的同步计算，验证了PINN在一族扩展Black-Scholes方程上的通用性。该工作的主要贡献在于同时计算Greeks（Delta、Gamma、Vega等），利用了PINN自动微分的天然优势。
 
-针对Heston随机波动率模型，Hainaut和Casas\cite{hainaut2024heston}基于Feynman-Kac方程构建了参数化PINN，通过对模型参数和合约特征（到期日）的联合参数化，实现了训练一次、多参数组合即时定价，相比蒙特卡洛和FFT方法具有显著的推断速度优势。
+针对Heston随机波动率模型，Hainaut和Casas\cite{hainaut2024heston}基于Feynman-Kac方程构建了参数化PINN，通过对模型参数和合约特征（到期日）的联合参数化，实现了训练一次、多参数组合即时定价，相比蒙特卡洛和FFT方法具有显著的推断速度优势。该工作是目前最接近本文的Heston PINN工作，但其方法依赖于特殊的网络结构，且未与BSM/CEV统一。
 
-在约束处理方面，Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，使终值条件精确满足而非近似满足，从而减少损失函数中的冲突项，加速收敛。Hadiasadeh等人\cite{dcpinns2024}提出了导数约束PINN（DC-PINN），进一步处理含导数不等式约束的PDE问题。
+在约束处理方面，Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，使终值条件精确满足而非近似满足，从而减少损失函数中的冲突项，加速收敛。本文借鉴了ICPINN的硬约束思路，通过加法参数化输出自然满足终值条件。
 
 \subsection{现有工作的局限性}
 
@@ -97,10 +144,12 @@ Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率
 
 大语言模型（Large Language Models，LLM）在科学计算领域的应用近年来取得了显著进展。Liu等人\cite{liu2025pdeagent}提出了PDE-AGENT，一个工具链增强的多智能体框架，能够从自然语言描述出发，自动调用数值求解工具完成PDE的求解，并通过双循环纠错机制处理工具调用失败的情况。该工作表明LLM具备理解PDE问题结构、选择合适求解策略的能力。
 
-在金融领域，Xiao等人\cite{xiao2024tradingagents}提出了TradingAgents框架，通过多个专业化LLM智能体的协作完成金融交易决策，验证了LLM在金融场景下的参数提取与任务路由能力。
+在金融领域，Xiao等人\cite{xiao2024tradingagents}提出了TradingAgents框架，通过多个专业化LLM智能体的协作完成金融交易决策，验证了LLM在金融场景下的参数提取与任务路由能力。该工作展示了LLM在金融领域的应用潜力，但其关注点在于交易决策，而非期权定价。
 
-上述工作表明，LLM作为"智能路由层"具有良好的可行性：通过解析用户的自然语言输入，提取期权类型和定价参数，并将任务分发至对应的PINN求解器，可以显著降低期权定价工具的使用门槛。
+LLM在结构化信息提取方面的能力是本文LLM路由层的核心依赖。现代LLM（如GPT-4、DeepSeek等）能够通过约束输出格式（如JSON模式）可靠地从自然语言中提取结构化参数，这一能力使得LLM作为"智能路由层"具有良好的可行性：通过解析用户的自然语言输入，提取期权类型和定价参数，并将任务分发至对应的PINN求解器，可以显著降低期权定价工具的使用门槛。
+
+与PDE-AGENT\cite{liu2025pdeagent}相比，本文的LLM路由层设计更为轻量：LLM仅负责参数提取和模型选择，不参与PDE求解过程，因此延迟更低（约500ms至2000ms的API调用，而非多轮工具调用）、可靠性更高（结构化JSON输出避免了自由文本解析的不确定性）。
 
 \section{本章小结}\label{sec:related_summary}
 
-本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式，回顾了PINN在期权定价中的代表性工作，并介绍了LLM辅助科学计算的最新进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。本文在此基础上，构建了LLM与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}~章。
+本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式及其特性，回顾了PINN在期权定价中的代表性工作，并介绍了LLM辅助科学计算的最新进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。本文在此基础上，构建了LLM与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}~章。
