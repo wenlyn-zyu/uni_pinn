@@ -4,80 +4,37 @@
 
 \section{三大期权定价模型}\label{sec:three_models}
 
-\subsection{模型参数定义}
-
-本文涉及的三大期权定价模型共享以下基础参数：$S$为标的资产（股票）的当前价格，$K$为期权执行价（Strike Price），$T$为期权到期时刻（$\tau=T-t$为剩余到期时间），$r$为无风险利率（连续复利形式），$V(S,t)$或$V(S,v,t)$为期权价值，是本文求解的目标函数。各模型还引入了刻画波动率结构的专有参数，详见下文各小节。
+三大模型共享基础参数：$S$为标的资产当前价格，$K$为执行价，$T$为到期时刻（$\tau=T-t$为剩余时间），$r$为无风险利率，$V$为期权价值。
 
 \subsection{Black-Scholes-Merton（BSM）模型}
 
-\subsubsection{模型假设与应用场景}
-
-BSM模型\cite{black1973pricing,merton1973theory}假设标的资产价格服从几何布朗运动：
-\begin{equation}\label{eq:bsm_sde}
-  \frac{dS}{S} = \mu\,dt + \sigma\,dW_t,
-\end{equation}
-其中$\mu$为漂移率，$\sigma>0$为常数波动率，$W_t$为标准布朗运动。
-
-BSM模型的核心假设是波动率$\sigma$为常数，这在以下场景中是合理的近似。对于波动率相对稳定的大盘蓝筹股（如标普500成分股），短期（1个月以内）期权的隐含波动率变化不大，BSM是业界最常用的定价基准。主要货币对（EUR/USD、USD/JPY等）的波动率在短期内较为平稳，BSM被广泛用于外汇期权的快速定价和对冲比率（Greeks）计算。在利率期权（如利率上限/下限）的Black模型中，BSM框架也被直接应用于远期利率的近似定价。
-
-BSM模型的专有参数为$\sigma$（常数波动率），其典型取值范围为$0.1$至$0.5$（即年化波动率10\%至50\%）。
-
-\subsubsection{BSM偏微分方程}
-
-在风险中性测度下，欧式看涨期权价值$V(S,t)$满足BSM偏微分方程：
+BSM模型\cite{black1973pricing,merton1973theory}假设标的资产价格服从几何布朗运动$dS/S = \mu\,dt + \sigma\,dW_t$，其中$\sigma>0$为常数波动率。在风险中性测度下，欧式看涨期权价值满足：
 \begin{equation}\label{eq:bsm_pde}
   \frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV = 0,
 \end{equation}
-终值条件为$V(S,T)=\max(S-K,0)$，边界条件为$V(0,t)=0$，$V(S,t)\to S-Ke^{-r(T-t)}$（$S\to\infty$）。
-
-BSM方程存在解析解（Black-Scholes公式）：
+终值条件$V(S,T)=\max(S-K,0)$，边界条件$V(0,t)=0$，$V(S,t)\to S-Ke^{-r(T-t)}$（$S\to\infty$）。BSM方程存在封闭解析解：
 \begin{align}
   V_\text{BS}(S,\tau;\sigma) &= S\Phi(d_1) - Ke^{-r\tau}\Phi(d_2), \label{eq:bs_formula}\\
   d_1 &= \frac{\ln(S/K)+(r+\sigma^2/2)\tau}{\sigma\sqrt{\tau}}, \quad d_2 = d_1 - \sigma\sqrt{\tau},
 \end{align}
-其中$\Phi(\cdot)$为标准正态累积分布函数，$\tau=T-t$。本文将此解析解作为加法参数化的基线（见第~\ref{sec:additive_param}节）。
+其中$\Phi(\cdot)$为标准正态累积分布函数。本文将此解析解作为加法参数化的基线（见第~\ref{sec:additive_param}节）。
 
 \subsection{常弹性方差（CEV）模型}
 
-\subsubsection{模型假设与应用场景}
-
-CEV模型\cite{cox1976valuation}将BSM的常数波动率推广为股价的幂函数：
-\begin{equation}\label{eq:cev_sde}
-  \frac{dS}{S} = \mu\,dt + \sigma S^{\beta-1}\,dW_t,
-\end{equation}
-即瞬时波动率为$\sigma S^{\beta-1}$，随股价变化而变化。参数$\beta$（弹性参数）控制波动率对股价的依赖程度：当$\beta=1$时退化为BSM（常数波动率）；当$\beta<1$时，波动率随股价下跌而上升，产生"杠杆效应"（Leverage Effect），符合股票市场的实证规律；当$\beta>1$时，波动率随股价上升而上升，适用于某些商品市场。
-
-CEV模型适用于以下场景。实证研究表明，股票价格下跌时波动率往往上升（负相关），CEV模型（$\beta<1$）能够捕捉这一特征，在个股期权定价中优于BSM。在利率模型中，CEV过程（$\beta=0.5$，即CIR过程）被用于建模短期利率，对应的期权定价也采用CEV框架。能源、农产品等商品的波动率与价格正相关（$\beta>1$），CEV模型能更好地拟合商品期权的隐含波动率曲面。
-
-CEV模型的专有参数为$\beta$（弹性参数），本文取$\beta=0.5$，对应中等强度的杠杆效应。
-
-\subsubsection{CEV偏微分方程}
-
-CEV模型下欧式看涨期权满足：
+CEV模型\cite{cox1976valuation}将BSM的常数波动率推广为$dS/S = \mu\,dt + \sigma S^{\beta-1}\,dW_t$，弹性参数$\beta<1$时波动率随股价下跌而上升，产生"杠杆效应"（Leverage Effect），符合股票市场的实证规律；$\beta=1$时退化为BSM。本文取$\beta=0.5$。对应PDE为：
 \begin{equation}\label{eq:cev_pde}
   \frac{\partial V}{\partial t} + \frac{1}{2}\sigma^2 S^{2\beta} \frac{\partial^2 V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV = 0.
 \end{equation}
-与BSM方程相比，扩散系数由$\sigma^2 S^2$变为$\sigma^2 S^{2\beta}$。CEV方程无封闭解析解（$\beta\neq 1$时），通常用有限差分法或级数展开法求解。
+与BSM相比，扩散系数由$\sigma^2 S^2$变为$\sigma^2 S^{2\beta}$，无封闭解析解，通常用有限差分法求解。
 
 \subsection{Heston随机波动率模型}
 
-\subsubsection{模型假设与应用场景}
-
-Heston模型\cite{heston1993closed}引入随机波动率，用二维随机微分方程组描述股价与方差的联合动态：
+Heston模型\cite{heston1993closed}引入随机波动率，用二维SDE描述股价与方差的联合动态：
 \begin{align}
   dS &= \mu S\,dt + \sqrt{v}\,S\,dW_t^S, \label{eq:heston_sde_s}\\
-  dv &= \kappa(\theta - v)\,dt + \xi\sqrt{v}\,dW_t^v, \label{eq:heston_sde_v}\\
-  dW_t^S\,dW_t^v &= \rho\,dt. \label{eq:heston_corr}
+  dv &= \kappa(\theta - v)\,dt + \xi\sqrt{v}\,dW_t^v, \quad dW_t^S\,dW_t^v = \rho\,dt, \label{eq:heston_sde_v}
 \end{align}
-各参数的物理含义如下：$v$为瞬时方差（即波动率的平方），是随机变量；$\kappa>0$为方差过程的均值回归速度，$\kappa$越大，方差越快回归长期均值；$\theta>0$为方差过程的长期均值（长期方差），$\sqrt{\theta}$为长期波动率；$\xi>0$为方差过程的波动率（vol-of-vol），刻画波动率本身的随机性强度；$\rho\in(-1,1)$为股价布朗运动$W_t^S$与方差布朗运动$W_t^v$的相关系数，通常为负值（股价下跌时波动率上升）；$v_0$为初始瞬时方差。
-
-方差过程~\eqref{eq:heston_sde_v}为CIR（Cox-Ingersoll-Ross）过程，当Feller条件$2\kappa\theta\geq\xi^2$满足时，方差过程严格为正。
-
-Heston模型适用于以下场景。标普500等指数期权的隐含波动率曲面呈现显著的"波动率偏斜"（Volatility Skew），Heston模型通过负相关系数$\rho<0$和随机波动率$\xi>0$能够拟合这一特征，是指数期权定价的行业标准模型之一。对于到期时间超过6个月的期权，波动率的随机性不可忽略，Heston模型比BSM更准确。VIX期权、方差互换等以波动率为标的的衍生品，需要对波动率过程本身建模，Heston框架是自然选择。纽约证券交易所（NYSE）和纳斯达克（NASDAQ）上市的股票期权，尤其是科技股期权（如AAPL、TSLA），波动率随机性强，Heston模型被广泛应用于做市商的定价系统。
-
-\subsubsection{Heston偏微分方程}
-
-在风险中性测度下，Heston模型下欧式看涨期权满足二维PDE：
+其中$\kappa$为均值回归速度，$\theta$为长期方差，$\xi$为vol-of-vol，$\rho$为两布朗运动的相关系数（通常$\rho<0$），$v_0$为初始方差。Feller条件$2\kappa\theta\geq\xi^2$保证方差过程严格为正。对应二维PDE为：
 \begin{equation}\label{eq:heston_pde}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}vS^2\frac{\partial^2 V}{\partial S^2}
@@ -87,13 +44,7 @@ Heston模型适用于以下场景。标普500等指数期权的隐含波动率�
   + \kappa(\theta-v)\frac{\partial V}{\partial v}
   - rV = 0.
 \end{equation}
-与BSM/CEV相比，Heston PDE新增了交叉偏导项$\rho\xi vS\cdot\partial^2 V/\partial S\partial v$和$v$方向的扩散项$\frac{1}{2}\xi^2 v\cdot\partial^2 V/\partial v^2$，使问题从一维升至二维，求解难度显著增加。Heston模型存在半解析解（特征函数方法），但数值实现较复杂；本文将其作为数据锚点的参考解。
-
-\subsection{本文的适用范围：美股市场欧式期权}
-
-本文的LLM路由层和统一PINN框架针对美股市场的欧式看涨/看跌期权设计。欧式期权在到期日才能行权，其定价满足确定的终值问题（PDE加终值条件加边界条件），PINN可以直接求解。芝加哥期权交易所（CBOE）提供标准化的美股期权数据，BSM、CEV、Heston三大模型的参数均可通过隐含波动率校准方法从市场数据中提取，本文实验使用的参数范围（$\sigma\in[0.1,0.5]$，$\kappa\in[1,5]$，$\xi\in[0.1,0.5]$，$\rho\in[-0.9,-0.3]$）与美股市场的实证参数范围吻合。此外，本文的LLM路由层（基于DeepSeek API）对英文金融术语（"European call"、"stochastic volatility"、"vol-of-vol"等）的理解能力强，能够准确识别并映射到对应的模型参数。
-
-将框架扩展至A股市场期权、美式期权及奇异期权等场景，是本文的重要未来工作方向，详见第~\ref{sec:future}节。
+Heston PDE新增了交叉偏导项和$v$方向扩散项，使问题从一维升至二维。模型存在半解析解（特征函数方法），本文将其作为数据锚点的参考解。
 
 \section{统一PDE算子}\label{sec:unified_pde}
 
@@ -143,25 +94,15 @@ BSM、CEV、Heston三大模型的PDE在形式上具有高度相似性，均可�
 
 \section{加法参数化输出}\label{sec:additive_param}
 
-\subsection{设计动机}
-
-直接用神经网络输出期权价格存在两个问题：初始化困难（期权价格量级约为$10^0$至$10^2$，随机初始化的网络输出量级约为$10^{-1}$，训练初期梯度信号弱）；以及深度虚值退化（当$S\ll K$时，期权价格趋近于0，乘法参数化$V=V_\text{BS}\cdot(1+\text{net})$在$V_\text{BS}\to 0$时退化，网络无法学习到有效的修正量）。
-
-\subsection{加法参数化}
-
-本文采用加法参数化输出：
+直接用神经网络输出期权价格存在两个问题：初始化困难（随机初始化的网络输出量级约为$10^{-1}$，而期权价格量级约为$10^0$至$10^2$，训练初期梯度信号弱）；以及深度虚值退化（当$S\ll K$时，乘法参数化$V=V_\text{BS}\cdot(1+\text{net})$在$V_\text{BS}\to 0$时退化，网络无法学习到有效的修正量）。为此，本文采用加法参数化输出：
 \begin{equation}\label{eq:additive}
   \hat{V}(S,v,t;\boldsymbol{\lambda}) = V_\text{BS}(S,\tau;\sigma_\text{eff}) + K\cdot\text{net}(x),
 \end{equation}
-其中$\tau=T-t$为剩余时间，$\sigma_\text{eff}$为等效波动率，$\text{net}(x)$为神经网络输出的修正量（以$K$为单位，量级约为$0$至$0.1$）。
-
-等效波动率$\sigma_\text{eff}$通过软掩码计算：
+其中$\sigma_\text{eff}$为等效波动率，$\text{net}(x)$为神经网络输出的修正量（以$K$为单位，量级约为$0$至$0.1$）。等效波动率通过软掩码计算：
 \begin{equation}\label{eq:sigma_eff}
-  \sigma_\text{eff} = (1-\text{mask})\cdot\sigma + \text{mask}\cdot\sqrt{v}.
+  \sigma_\text{eff} = (1-\text{mask})\cdot\sigma + \text{mask}\cdot\sqrt{v},
 \end{equation}
-即BSM/CEV时用常数波动率$\sigma$，Heston时用当前方差$v$的平方根作为近似波动率。
-
-加法参数化具有以下优势：网络最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，使训练开始时$K\cdot\text{net}\approx 0.1\ll V_\text{BS}\approx 10$，网络从接近正确答案的位置开始优化；深度虚值时$V_\text{BS}\to 0$，但$K\cdot\text{net}$仍可输出非零修正，网络可以学习到CEV/Heston相对于BSM的价格差异；物理意义清晰——对BSM，$\text{net}\to 0$（BSM解析解已精确）；对CEV，$\text{net}$学习弹性指数修正；对Heston，$\text{net}$学习随机波动率修正。
+即BSM/CEV时用常数波动率$\sigma$，Heston时用当前方差$v$的平方根作为近似波动率。网络最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，使训练开始时$K\cdot\text{net}\approx 0$，网络从接近正确答案的位置开始优化；深度虚值时$V_\text{BS}\to 0$，但$K\cdot\text{net}$仍可输出非零修正，网络可以学习到CEV/Heston相对于BSM的价格差异。
 
 \section{网络架构}\label{sec:architecture}
 
@@ -183,7 +124,7 @@ BSM、CEV、Heston三大模型的PDE在形式上具有高度相似性，均可�
 \end{align}
 最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，偏置初始化为0，确保训练开始时$\text{net}\approx 0$。
 
-$\tanh$激活函数的选择基于以下考虑：（1）$\tanh$是光滑函数，其高阶导数存在且有界，适合PINN中需要计算二阶偏导数的场景；（2）$\tanh$的输出范围$(-1,1)$有助于控制网络输出的量级；（3）相比ReLU，$\tanh$在原点附近的梯度更大，有助于训练初期的快速收敛。
+$\tanh$激活函数光滑且高阶导数有界，适合PINN中需要计算二阶偏导数的场景，同时其输出范围$(-1,1)$有助于控制网络输出量级。
 
 \subsection{终值条件的近似硬约束}
 
@@ -191,15 +132,12 @@ $\tanh$激活函数的选择基于以下考虑：（1）$\tanh$是光滑函数�
 
 \section{损失函数}\label{sec:loss}
 
-\subsection{复合损失}
-
-统一PINN的总损失由三部分组成：
+统一PINN的总损失由PDE残差、边界条件和数据锚点三部分组成：
 \begin{equation}\label{eq:total_loss}
   \mathcal{L}(\theta) = w_\text{pde}\,\mathcal{L}_\text{pde}
                       + w_\text{bc}\,\mathcal{L}_\text{bc}
-                      + w_\text{data}\,\mathcal{L}_\text{data},
+                      + w_\text{data}\,\mathcal{L}_\text{data}.
 \end{equation}
-其中各项定义如下。
 
 \subsection{PDE残差损失}
 
@@ -295,13 +233,7 @@ LLM的输出遵循以下JSON Schema：
 
 系统在接收到JSON输出后，进行参数范围校验（如$\sigma>0$，$\beta\in(0,1]$，$\xi>0$，$\rho\in(-1,1)$），对越界参数截断至合法范围，再传入统一PINN求解器。
 
-\subsection{路由规则}
-
-LLM根据以下规则选择模型：若用户仅提供常数波动率$\sigma$，选择BSM；若用户提及弹性参数$\beta$或"CEV"，选择CEV；若用户提供随机波动率参数（$\kappa,\theta,\xi,\rho,v_0$）或提及"Heston"，选择Heston；默认选择BSM。
-
 \subsection{参数提取与系统流程}
-
-LLM接收用户的自然语言输入，通过\texttt{response\_format: json\_object}约束输出格式，输出结构化JSON参数，包含模型类型、期权类型和所有定价参数。系统提示明确规定了参数格式和默认值，对缺失参数使用合理默认值（$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$）。
 
 完整的定价流程如下：用户输入自然语言描述（中文或英文均可）；LLM解析输入，提取期权参数，选择定价模型；统一PINN加载预训练权重，根据提取的参数构造$\boldsymbol{\lambda}$向量；网络前向传播，返回期权价格（约2ms）；系统返回期权价格及所用模型信息。
 
