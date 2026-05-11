@@ -1,0 +1,215 @@
+%---------------------------------------------------------------------------%
+%-                                                                         -%
+%-                             Bibliography                                -%
+%-                                                                         -%
+%---------------------------------------------------------------------------%
+
+%--- 经典期权定价模型 --------------------------------------------------------
+
+@article{black1973pricing,
+  author  = {Black, Fischer and Scholes, Myron},
+  title   = {The Pricing of Options and Corporate Liabilities},
+  journal = {Journal of Political Economy},
+  volume  = {81},
+  number  = {3},
+  pages   = {637--654},
+  year    = {1973},
+  doi     = {10.1086/260062}
+}
+
+@article{merton1973theory,
+  author  = {Merton, Robert C.},
+  title   = {Theory of Rational Option Pricing},
+  journal = {The Bell Journal of Economics and Management Science},
+  volume  = {4},
+  number  = {1},
+  pages   = {141--183},
+  year    = {1973},
+  doi     = {10.2307/3003143}
+}
+
+@article{cox1976valuation,
+  author  = {Cox, John C. and Ross, Stephen A.},
+  title   = {The Valuation of Options for Alternative Stochastic Processes},
+  journal = {Journal of Financial Economics},
+  volume  = {3},
+  number  = {1--2},
+  pages   = {145--166},
+  year    = {1976},
+  doi     = {10.1016/0304-405X(76)90023-4}
+}
+
+@article{beckers1980constant,
+  author  = {Beckers, Stan},
+  title   = {The Constant Elasticity of Variance Model and Its Implications
+             for Option Pricing},
+  journal = {The Journal of Finance},
+  volume  = {35},
+  number  = {3},
+  pages   = {661--673},
+  year    = {1980},
+  doi     = {10.1111/j.1540-6261.1980.tb03490.x}
+}
+
+@article{schroder1989computing,
+  author  = {Schroder, Mark},
+  title   = {Computing the Constant Elasticity of Variance Option Pricing
+             Formula},
+  journal = {The Journal of Finance},
+  volume  = {44},
+  number  = {1},
+  pages   = {211--219},
+  year    = {1989},
+  doi     = {10.1111/j.1540-6261.1989.tb02414.x}
+}
+
+@article{heston1993closed,
+  author  = {Heston, Steven L.},
+  title   = {A Closed-Form Solution for Options with Stochastic Volatility
+             with Applications to Bond and Currency Options},
+  journal = {The Review of Financial Studies},
+  volume  = {6},
+  number  = {2},
+  pages   = {327--343},
+  year    = {1993},
+  doi     = {10.1093/rfs/6.2.327}
+}
+
+%--- PINN 基础方法 -----------------------------------------------------------
+
+@article{raissi2019physics,
+  author  = {Raissi, Maziar and Perdikaris, Paris and Karniadakis, George E.},
+  title   = {Physics-Informed Neural Networks: A Deep Learning Framework for
+             Solving Forward and Inverse Problems Involving Nonlinear
+             Partial Differential Equations},
+  journal = {Journal of Computational Physics},
+  volume  = {378},
+  pages   = {686--707},
+  year    = {2019},
+  doi     = {10.1016/j.jcp.2018.10.045}
+}
+
+%--- PINN 期权定价 -----------------------------------------------------------
+
+@article{dhiman2023pinn,
+  author  = {Dhiman, Ashish and Hu, Yibei},
+  title   = {Physics Informed Neural Network for Option Pricing},
+  journal = {arXiv preprint arXiv:2312.06711},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2312.06711}
+}
+
+@mastersthesis{zamxaka2023cev,
+  author  = {Zamxaka, Nichume},
+  title   = {Option Pricing with {P}hysics-Informed Neural Networks},
+  school  = {University of Cape Town},
+  year    = {2023},
+  note    = {MPhil dissertation, supervised by Dr Ralph Rudd}
+}
+
+@misc{louskos2021american,
+  author = {Louskos, Andreas},
+  title  = {Pricing {A}merican Options with {P}hysics-{I}nformed Neural Networks},
+  howpublished = {Undergraduate thesis, Dartmouth College},
+  year   = {2021},
+  url    = {https://math.dartmouth.edu/theses/undergrad/2021/Louskos-thesis.pdf}
+}
+
+@article{guo2024icpinn,
+  author  = {Guo, Jiajun and others},
+  title   = {Improved Constrained {P}hysics-Informed Neural Networks
+             ({ICPINN}s) to Solve {PDE} and Its Application to Option Pricing},
+  journal = {Mathematics and Computers in Simulation},
+  volume  = {241},
+  pages   = {908--924},
+  year    = {2026}
+}
+
+@article{hainaut2024heston,
+  author  = {Hainaut, Donatien and Casas, Alex},
+  title   = {Option Pricing in the {H}eston Model with Physics Inspired
+             Neural Networks},
+  journal = {Annals of Finance},
+  volume  = {20},
+  pages   = {353--376},
+  year    = {2024},
+  doi     = {10.1007/s10436-024-00452-7}
+}
+
+@article{bae2024localvol,
+  author  = {Bae, HyeongOhk and Kang, Seunggu and Lee, Muhyun},
+  title   = {Option Pricing and Local Volatility Surface by
+             {P}hysics-Informed Neural Network},
+  journal = {Computational Economics},
+  volume  = {64},
+  pages   = {3143--3159},
+  year    = {2024},
+  doi     = {10.1007/s10614-024-10551-2}
+}
+
+@article{dcpinns2024,
+  author  = {Hadiasadeh, Kamran and Phelan, Carolyn E. and Barrera, Paulo},
+  title   = {{DC-PINN}s: {P}hysics-Informed Neural Networks with
+             Derivative Constraints},
+  journal = {arXiv preprint arXiv:2312.03539},
+  year    = {2023},
+  url     = {https://arxiv.org/abs/2312.03539}
+}
+
+%--- 神经网络期权定价（非 PINN）----------------------------------------------
+
+@article{wang2022ntk,
+  author  = {Wang, Sifan and Teng, Yujun and Perdikaris, Paris},
+  title   = {Understanding and Mitigating Gradient Flow Pathologies in
+             Physics-Informed Neural Networks},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {43},
+  number  = {5},
+  pages   = {A3055--A3081},
+  year    = {2021},
+  doi     = {10.1137/20M1318043}
+}
+
+@article{lu2021deepxde,
+  author  = {Lu, Lu and Meng, Xuhui and Mao, Zhiping and Karniadakis, George Em},
+  title   = {{DeepXDE}: A Deep Learning Library for Solving Differential Equations},
+  journal = {SIAM Review},
+  volume  = {63},
+  number  = {1},
+  pages   = {208--228},
+  year    = {2021},
+  doi     = {10.1137/19M1274067}
+}
+
+@article{liu2019pricing,
+  author  = {Liu, Shuaiqiang and Oosterlee, Cornelis W. and Bohte, Sander M.},
+  title   = {Pricing Options and Computing Implied Volatilities Using
+             Neural Networks},
+  journal = {Risks},
+  volume  = {7},
+  number  = {1},
+  pages   = {16},
+  year    = {2019},
+  doi     = {10.3390/risks7010016}
+}
+
+%--- LLM 辅助 PDE 求解 -------------------------------------------------------
+
+@article{liu2025pdeagent,
+  author  = {Liu, Jianming and Zhu, Ren and Xu, Jian and Ding, Kun and
+             Zhang, Xu-Yao and Meng, Gaofeng and Liu, Cheng-Lin},
+  title   = {{PDE-AGENT}: A Toolchain-Augmented Multi-Agent Framework
+             for {PDE} Solving},
+  journal = {arXiv preprint arXiv:2512.16214},
+  year    = {2025}
+}
+
+@article{xiao2024tradingagents,
+  author  = {Xiao, Yijia and others},
+  title   = {{TradingAgents}: Multi-Agents {LLM} Financial Trading Framework},
+  journal = {arXiv preprint arXiv:2412.20138},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2412.20138}
+}
+
+%---------------------------------------------------------------------------%
