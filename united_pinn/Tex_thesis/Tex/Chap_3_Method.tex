@@ -200,42 +200,7 @@ $\tanh$激活函数光滑且高阶导数有界，适合PINN中需要计算二阶
 
 \section{LLM路由层}\label{sec:llm_router}
 
-\subsection{设计动机}
-
-三种PINN模型分别适用于不同的市场假设：BSM适用于波动率平稳的市场，CEV适用于存在杠杆效应的股票市场，Heston适用于波动率本身随机变化的场景。传统工具要求用户手动指定模型类型和参数，门槛较高。
-
-本文引入LLM作为智能路由层，使用户可以通过自然语言描述期权需求，由LLM自动完成模型选择和参数提取。相比基于规则的解析器，LLM能够处理模糊表达（如"波动率大约20\%"、"存在杠杆效应"）和多语言输入，鲁棒性更强。
-
-\subsection{提示词工程}
-
-LLM路由层的核心是系统提示词（System Prompt）的设计，包含以下要素。首先是角色定义，明确LLM的角色为"期权定价参数提取器"，要求其从用户输入中提取结构化参数，而非进行对话或解释。其次是模型选择规则：若用户仅提供常数波动率$\sigma$，选择\texttt{"bsm"}；若用户提及弹性参数$\beta$或"CEV"/"constant elasticity"，选择\texttt{"cev"}；若用户提供随机波动率参数（$\kappa,\theta,\xi,\rho,v_0$）或提及"Heston"/"stochastic volatility"，选择\texttt{"heston"}；默认选择\texttt{"bsm"}。再次是参数默认值，对用户未提及的参数规定使用以下默认值：$S=100$，$K=100$，$T=1.0$，$r=0.05$，$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，这些默认值对应美股市场的典型参数范围。最后通过API的\texttt{response\_format: \{type: "json\_object"\}}参数强制LLM输出合法JSON，避免自然语言混入结构化输出。
-
-\subsection{JSON输出Schema}
-
-LLM的输出遵循以下JSON Schema：
-\begin{verbatim}
-{
-  "model": "bsm" | "cev" | "heston",
-  "option_type": "call" | "put",
-  "S": float,      // 当前股价
-  "K": float,      // 执行价
-  "T": float,      // 到期时间（年）
-  "r": float,      // 无风险利率
-  "sigma": float,  // BSM/CEV波动率参数
-  "beta": float,   // CEV弹性参数（仅CEV）
-  "v0": float,     // 初始方差（仅Heston）
-  "kappa": float,  // 均值回归速度（仅Heston）
-  "theta": float,  // 长期方差（仅Heston）
-  "xi": float,     // vol-of-vol（仅Heston）
-  "rho": float     // 相关系数（仅Heston）
-}
-\end{verbatim}
-
-系统在接收到JSON输出后，进行参数范围校验（如$\sigma>0$，$\beta\in(0,1]$，$\xi>0$，$\rho\in(-1,1)$），对越界参数截断至合法范围，再传入统一PINN求解器。
-
-\subsection{参数提取与系统流程}
-
-完整的定价流程如下：用户输入自然语言描述（中文或英文均可）；LLM解析输入，提取期权参数，选择定价模型；统一PINN加载预训练权重，根据提取的参数构造$\boldsymbol{\lambda}$向量；网络前向传播，返回期权价格（约2ms）；系统返回期权价格及所用模型信息。
+本文引入DeepSeek LLM作为智能路由层，使用户可以通过自然语言描述期权需求，由LLM自动完成模型选择和参数提取，无需手动指定模型类型和数值参数。系统提示词将LLM角色定义为"期权定价参数提取器"，规定模型选择规则（仅提供$\sigma$则选BSM，提及$\beta$或"CEV"则选CEV，提供$\kappa,\theta,\xi,\rho,v_0$或提及"Heston"则选Heston，默认BSM），并通过\texttt{response\_format: json\_object}强制输出合法JSON。缺失参数使用美股市场典型默认值（$\sigma=0.2$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），系统对越界参数截断至合法范围后传入统一PINN求解器。完整流程为：用户输入自然语言描述，LLM提取参数并选择模型，统一PINN前向传播返回期权价格（约2ms）。
 
 \section{本章小结}\label{sec:method_summary}
 
