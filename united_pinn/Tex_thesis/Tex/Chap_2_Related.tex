@@ -135,8 +135,7 @@ Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率
 综合上述工作，现有PINN期权定价研究存在以下不足：
 \begin{enumerate}
   \item \textbf{模型孤立}：各研究针对单一模型（BSM或Heston），缺乏统一框架同时支持多种定价模型；
-  \item \textbf{交互门槛高}：用户需手动指定模型类型和参数，无法通过自然语言描述需求；
-  \item \textbf{Heston收敛困难}：二维PDE包含交叉偏导项，独立训练的PINN在Heston上往往收敛困难。
+  \item \textbf{交互门槛高}：用户需手动指定模型类型和参数，无法通过自然语言描述需求。
 \end{enumerate}
 本文针对上述不足，提出将三大模型统一为单一参数化PINN的方法。
 

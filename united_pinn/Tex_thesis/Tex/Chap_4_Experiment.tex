@@ -1,6 +1,6 @@
 \chapter{实验}\label{chap:experiment}
 
-本章报告统一PINN框架的实验结果，包括训练过程分析、精度评估、与独立PINN基线的对比、LLM路由层的准确率测试，以及基于真实SPY期权市场数据的模型对比验证。
+本章报告统一PINN框架的实验结果，包括训练过程分析、精度评估、推断速度对比、LLM路由层的准确率测试，以及基于真实SPY期权市场数据的模型对比验证。
 
 \section{实验设置}\label{sec:exp_setup}
 
@@ -43,17 +43,17 @@
     超参数 & 取值 \\
     \hline
     网络层数（深度） & 6 \\
-    每层神经元数（宽度） & 256 \\
+    每层神经元数（宽度） & 128 \\
     激活函数 & $\tanh$ \\
     输入维度 & 9 \\
     输出维度 & 1 \\
     优化器 & Adam \cite{kingma2014adam} \\
     初始学习率 & $10^{-3}$ \\
-    学习率衰减 & 每5000步$\times 0.5$ \\
-    训练步数 & 50000 \\
-    每步配点数$N_c$ & 每模型512点（共3072） \\
-    边界点数$N_b$ & 300 \\
-    数据锚点数$N_d$ & 60（每模型20） \\
+    学习率衰减 & 余弦退火（$\eta_\text{min}=10^{-5}$） \\
+    训练步数 & 30000 \\
+    每步配点数$N_c$ & 每模型512点（共26624） \\
+    边界点数$N_b$ & 每模型500点 \\
+    数据锚点数$N_d$ & 每模型20点（共1040） \\
     损失权重$(w_\text{pde}, w_\text{bc}, w_\text{data})$ & $(1, 10, 100)$ \\
     \hline
   \end{tabular}
@@ -80,21 +80,21 @@
 
 \section{训练过程分析}\label{sec:training_analysis}
 
-图~\ref{fig:training_loss}展示了统一PINN（v13版本）的训练损失曲线。
+图~\ref{fig:training_loss}展示了统一PINN（v15版本）的训练损失曲线。
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
-  \caption{统一PINN训练损失曲线（v13，共20000轮）。总损失在约5000轮后趋于稳定，最终收敛至$9.1\times 10^{-3}$。PDE残差损失主导总损失，边界条件损失和数据锚点损失在训练早期快速下降。}
+  \caption{统一PINN训练损失曲线（v15，共30000轮，52个参数变体）。总损失在约5000轮后趋于稳定，PDE残差损失主导总损失，边界条件损失和数据锚点损失在训练早期快速下降。}
   \label{fig:training_loss}
 \end{figure}
 
 训练过程的关键观察：
 \begin{itemize}
-  \item 总损失从初始约$0.5$下降至最终$1.14\times 10^{-2}$，最低点为$9.13\times 10^{-3}$（第19000轮）；
-  \item PDE残差损失（$\mathcal{L}_\text{pde}$）主导总损失，最终约$1.02\times 10^{-2}$；
-  \item 边界条件损失（$\mathcal{L}_\text{bc}$）和数据锚点损失（$\mathcal{L}_\text{data}$）均在$10^{-6}$量级，说明边界条件和数据锚点均被精确满足；
-  \item 余弦退火学习率调度使损失在后期持续缓慢下降，避免了阶梯式调度的震荡。
+  \item 总损失从初始约$0.5$持续下降，余弦退火学习率调度使损失在后期持续缓慢下降；
+  \item PDE残差损失（$\mathcal{L}_\text{pde}$）主导总损失；
+  \item 边界条件损失（$\mathcal{L}_\text{bc}$）和数据锚点损失（$\mathcal{L}_\text{data}$）在训练早期快速下降至$10^{-5}$量级，说明边界条件和数据锚点均被精确满足；
+  \item v15版本将训练参数变体从3个扩展至52个（覆盖真实市场校准参数范围），网络在更广泛的参数空间上训练，泛化能力显著提升。
 \end{itemize}
 
 \section{精度评估}\label{sec:accuracy}
@@ -105,7 +105,7 @@
 
 \begin{table}[htbp]
   \centering
-  \caption{统一PINN（v13）在三大模型上的精度评估}
+  \caption{统一PINN（v15）在三大模型上的精度评估}
   \label{tab:accuracy}
   \begin{tabular}{lccc}
     \hline
@@ -151,48 +151,7 @@ BSM和Heston的ATM相对误差均低于1\%，达到实用精度。CEV的ATM相�
 
 误差分布呈现出典型的"U形"特征：ATM区域误差最小，深度虚值和深度实值区域误差较大。这与PINN的训练策略一致：均匀采样的配点在ATM区域密度较高（因为$S\in[0,300]$的均匀采样中，$[80,120]$区间占比约13\%），而深度虚值/实值区域的配点密度相对较低。
 
-\section{与独立PINN基线的对比}\label{sec:comparison}
-
-本节简要对比统一PINN与独立训练PINN基线的性能差异，以说明统一框架的必要性。独立PINN基线采用与统一PINN相同的网络结构，但仅针对单一模型训练，不使用混合采样和软掩码机制。
-
-\subsection{独立PINN基线}
-
-为评估统一框架的优势，本文实现了独立训练的PINN基线：
-\begin{itemize}
-  \item \textbf{独立BSM PINN}：2层全连接网络，64个神经元，仅针对BSM方程训练；
-  \item \textbf{独立Heston PINN}：4层全连接网络，128个神经元，仅针对Heston方程训练。
-\end{itemize}
-
-\subsection{对比结果}
-
-表~\ref{tab:comparison}报告了统一PINN与独立PINN基线的对比结果。
-
-\begin{table}[htbp]
-  \centering
-  \caption{统一PINN与独立PINN基线的精度对比}
-  \label{tab:comparison}
-  \begin{tabular}{llccc}
-    \hline
-    模型 & 方法 & MAE & RMSE & 收敛状态 \\
-    \hline
-    BSM & 独立PINN & 0.057 & 0.082 & 收敛 \\
-    BSM & 统一PINN & 0.067 & 0.094 & 收敛 \\
-    \hline
-    Heston & 独立PINN & --- & --- & \textbf{未收敛}（loss$\approx 10^3$） \\
-    Heston & 统一PINN & \textbf{0.031} & \textbf{0.037} & 收敛 \\
-    \hline
-  \end{tabular}
-\end{table}
-
-关键发现：
-\begin{itemize}
-  \item \textbf{BSM}：统一PINN的MAE（0.067）略高于独立PINN（0.057），差异约17\%。这是合理的代价：统一网络需要同时覆盖三种模型，参数容量被分摊，BSM精度略有下降。
-  \item \textbf{Heston}：独立PINN完全无法收敛（训练损失停留在$10^3$量级），而统一PINN成功收敛至MAE=0.031。这是统一框架最显著的优势：通过与BSM/CEV的联合训练，网络获得了更好的初始化和梯度信号，克服了Heston二维PDE的收敛困难。
-\end{itemize}
-
-独立Heston PINN收敛失败的原因分析：Heston PDE包含交叉偏导项$\rho\xi vS\cdot\partial^2 V/\partial S\partial v$，该项在训练初期产生大量噪声梯度；同时，二维问题的配点数量需要远多于一维情形，但独立训练时配点全部用于Heston，无法从BSM/CEV的简单结构中获益。统一PINN通过混合采样，使网络先在BSM/CEV上建立良好的基础表示，再逐步适应Heston的复杂结构。
-
-\subsection{推断速度对比}
+\section{推断速度对比}\label{sec:speed}
 
 表~\ref{tab:speed}报告了不同方法的推断速度对比（单次定价，CPU推断）。
 
@@ -449,7 +408,6 @@ ATM相对误差的计算公式为：
 本章通过系统实验验证了统一PINN框架的有效性。主要结论如下：
 \begin{enumerate}
   \item 统一PINN在BSM（ATM相对误差0.31\%）和Heston（ATM相对误差0.52\%）上达到实用精度，CEV的绝对精度与BSM相当；
-  \item 独立Heston PINN完全无法收敛，而统一框架通过混合训练成功解决了Heston的收敛困难；
   \item 消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性；
   \item LLM路由层在20个测试用例上实现了100\%的模型选择准确率；
   \item 真实市场回测（SPY期权链，748个合约，8个到期日）表明：（a）校准Heston和CEV在中长期期权（$T>0.25$年）上显著优于BSM，Heston MAE最低可达BSM的40\%；（b）PINN-BSM在训练参数范围内具有良好的泛化能力，MAE仅比校准BSM高30\%至60\%；（c）PINN-Heston因训练参数范围与真实市场不匹配，定价误差较大，需扩大训练域；
