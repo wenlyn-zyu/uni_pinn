@@ -447,7 +447,7 @@ ATM相对误差的计算公式为：
 \section{本章小结}\label{sec:exp_summary}
 
 本章通过系统实验验证了统一PINN框架的有效性。主要结论如下：
-\begin{enumerate}
+\begin{enumerate}
   \item 统一PINN在BSM（ATM相对误差0.31\%）和Heston（ATM相对误差0.52\%）上达到实用精度，CEV的绝对精度与BSM相当；
   \item 独立Heston PINN完全无法收敛，而统一框架通过混合训练成功解决了Heston的收敛困难；
   \item 消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性；
