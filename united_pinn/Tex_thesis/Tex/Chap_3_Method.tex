@@ -1,6 +1,6 @@
 \chapter{方法}\label{chap:method}
 
-本章介绍基于物理信息神经网络（PINN）与大语言模型（LLM）的统一期权定价框架。系统整体流程为：用户以自然语言描述期权需求，LLM路由层解析参数并选择模型，统一PINN求解器返回定价结果。
+本章介绍基于PINN与LLM的统一期权定价框架。在第~\ref{sec:three_models}节中，概述三大定价模型对统一框架设计的关键影响；在第~\ref{sec:unified_pde}节中，介绍统一PDE算子与软掩码机制；在第~\ref{sec:additive_param}节中，介绍加法参数化输出设计；在第~\ref{sec:architecture}节中，描述网络架构；在第~\ref{sec:loss}节中，给出损失函数的构成与权重选择；在第~\ref{sec:training}节中，介绍训练策略；在第~\ref{sec:llm_router}节中，介绍LLM路由层的设计。系统整体流程为：用户以自然语言描述期权需求，LLM路由层解析参数并选择模型，统一PINN求解器返回定价结果。
 
 \section{三大期权定价模型}\label{sec:three_models}
 

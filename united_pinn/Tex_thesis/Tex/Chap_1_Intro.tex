@@ -1,22 +1,26 @@
 \chapter{引言}\label{chap:intro}
 
+本章介绍本文的研究背景与意义，梳理现有工作的局限性，阐述本文的研究目标与主要贡献，并给出论文的整体结构安排。在第~\ref{sec:background}节中，介绍期权定价的研究背景及其重要性；在第~\ref{sec:motivation}节中，分析现有PINN期权定价工作的不足；在第~\ref{sec:contributions}节中，阐述本文的研究目标与贡献；在第~\ref{sec:structure}节中，给出论文的章节安排。
+
 \section{研究背景与意义}\label{sec:background}
 
 期权是金融衍生品市场的核心工具之一，广泛应用于风险对冲、投机和套利。根据国际清算银行（BIS）统计，全球场外衍生品市场名义本金规模超过600万亿美元，其中期权类产品占据重要份额。期权定价的准确性直接影响风险对冲效率、投资组合管理决策和监管资本计算，是金融工程领域的核心问题之一。
 
-自Black、Scholes与Merton于1973年提出BSM模型\cite{black1973pricing,merton1973theory}以来，期权定价理论经历了从常数波动率到局部波动率、再到随机波动率的演进。BSM模型假设标的资产波动率为常数，具有封闭解析解，计算效率极高，适用于波动率相对平稳的短期定价场景，但无法解释市场中普遍存在的波动率微笑（volatility smile）现象——即不同执行价的隐含波动率并非常数，而是呈现出"微笑"或"偏斜"形状。Cox和Ross\cite{cox1976valuation}提出的常弹性方差（CEV）模型将常数波动率推广为依赖于标的价格的局部波动率$\sigma S^{\beta-1}$，能够捕捉股票市场中波动率随股价下跌而上升的杠杆效应，更好地拟合股票期权的波动率偏斜。Heston\cite{heston1993closed}进一步引入随机波动率过程（CIR过程），更准确地描述波动率微笑和厚尾收益率分布，在外汇期权、指数期权等场景中被广泛使用，但其数值求解二维PDE的计算代价显著高于一维情形。
+自Black、Scholes与Merton于1973年提出Black-Scholes-Merton（简记为BSM）模型\cite{black1973pricing,merton1973theory}以来，期权定价理论经历了从常数波动率到局部波动率、再到随机波动率的演进。BSM模型假设标的资产波动率为常数，具有封闭解析解，计算效率极高，适用于波动率相对平稳的短期定价场景，但无法解释市场中普遍存在的波动率微笑（volatility smile）现象——即不同执行价的隐含波动率并非常数，而是呈现出"微笑"或"偏斜"形状。Cox和Ross\cite{cox1976valuation}提出的常弹性方差（Constant Elasticity of Variance，简记为CEV）模型将常数波动率推广为依赖于标的价格的局部波动率$\sigma S^{\beta-1}$，能够捕捉股票市场中波动率随股价下跌而上升的杠杆效应，更好地拟合股票期权的波动率偏斜。Heston\cite{heston1993closed}进一步引入随机波动率过程（Cox-Ingersoll-Ross过程，简记为CIR过程），更准确地描述波动率微笑和厚尾收益率分布，在外汇期权、指数期权等场景中被广泛使用，但其数值求解二维偏微分方程（Partial Differential Equation，简记为PDE）的计算代价显著高于一维情形。
 
 然而，传统数值方法（有限差分、有限元）在求解高维PDE时面临"维数灾难"（curse of dimensionality）：网格点数随维度指数增长，Heston这样的二维模型已需要大量计算资源（网格$200\times200\times200$约需500ms），而更高维的随机波动率模型则几乎无法用传统方法实时求解。此外，传统工具要求用户手动指定模型类型和参数，对非专业用户门槛较高——选择合适的定价模型本身就需要量化金融背景，普通用户难以判断在当前市场条件下应使用BSM、CEV还是Heston。
 
-物理信息神经网络（Physics-Informed Neural Networks，PINN）\cite{raissi2019physics}提供了一种新的思路：将PDE残差直接嵌入神经网络的损失函数，无需网格剖分，训练完成后可对任意输入即时推断（单次推断约2ms，远低于有限差分的约500ms）。近年来，PINN已被应用于BSM\cite{dhiman2023pinn}、CEV\cite{bae2024localvol}、Heston\cite{hainaut2024heston,guo2024icpinn}等期权定价模型，展现出良好的精度和效率。与此同时，大语言模型（Large Language Models，LLM）在自然语言理解和结构化信息提取方面取得了突破性进展。将LLM与科学计算工具结合，使用户能够通过自然语言描述问题并获得计算结果，是人机交互的重要方向\cite{liu2025pdeagent}。在期权定价场景中，LLM的核心价值在于将"选择合适的定价模型"这一需要专业知识的决策自动化，使非专业用户只需描述期权需求，系统自动完成模型选择和参数提取。
+物理信息神经网络（Physics-Informed Neural Networks，简记为PINN）\cite{raissi2019physics}提供了一种新的思路：将PDE残差直接嵌入神经网络的损失函数，无需网格剖分，训练完成后可对任意输入即时推断（单次推断约2ms）。近年来，PINN已被应用于BSM\cite{dhiman2023pinn}、CEV\cite{bae2024localvol}、Heston\cite{hainaut2024heston,guo2024icpinn}等期权定价模型，展现出良好的精度和效率。与此同时，大语言模型（Large Language Models，简记为LLM）在自然语言理解和结构化信息提取方面取得了突破性进展。将LLM与科学计算工具结合，使用户能够通过自然语言描述问题并获得计算结果，是人机交互的重要方向\cite{liu2025pdeagent}。在期权定价场景中，LLM的核心价值在于将"选择合适的定价模型"这一需要专业知识的决策自动化，使非专业用户只需描述期权需求，系统自动完成模型选择和参数提取。
 
 \section{现有工作的局限性}\label{sec:motivation}
 
-综合现有PINN期权定价研究，存在两方面主要不足。其一，模型孤立，缺乏统一框架。现有工作（Dhiman等\cite{dhiman2023pinn}、Bae等\cite{bae2024localvol}、Hainaut等\cite{hainaut2024heston}）均针对单一模型分别训练独立的PINN，三个模型之间无法共享网络权重和训练经验，当需要同时支持多种模型时，必须维护多套独立的训练流程和模型文件，工程复杂度高。其二，交互门槛高，缺乏自然语言接口。现有PINN工具要求用户手动指定模型类型（BSM/CEV/Heston）和所有数值参数，对非专业用户不友好。不同市场条件下应选用何种模型，需要量化金融背景，普通用户难以判断。例如，当用户描述"我想对一个波动率随机变化的股票期权定价"时，传统工具无法理解这一自然语言描述，而需要用户明确指定Heston模型及其所有参数（$\kappa,\theta,\xi,\rho,v_0$）。本文针对上述不足，提出将三大模型统一为单一参数化PINN的方法，并结合LLM路由层构建完整的自然语言期权定价系统。
+综合现有PINN期权定价研究，存在两方面主要不足。其一，模型孤立，缺乏统一框架。现有工作（Dhiman等\cite{dhiman2023pinn}、Bae等\cite{bae2024localvol}、Hainaut等\cite{hainaut2024heston}）均针对单一模型分别训练独立的PINN，三个模型之间无法共享网络权重和训练经验，当需要同时支持多种模型时，必须维护多套独立的训练流程和模型文件，工程复杂度高。其二，交互门槛高，缺乏自然语言接口。现有PINN工具要求用户手动指定模型类型（BSM/CEV/Heston）和所有数值参数，对非专业用户不友好。不同市场条件下应选用何种模型，需要量化金融背景，普通用户难以判断。例如，当用户描述"我想对一个波动率随机变化的股票期权定价"时，传统工具无法理解这一自然语言描述，而需要用户明确指定Heston模型及其所有参数（$\kappa,\theta,\xi,\rho,v_0$）。基于上述不足，本文提出将三大模型统一为单一参数化PINN的方法，并结合LLM路由层构建完整的自然语言期权定价系统。
 
 \section{研究目标与贡献}\label{sec:contributions}
 
-本文的研究目标是构建一个基于PINN与LLM的统一期权定价框架，通过统一PDE算子将BSM、CEV、Heston三大模型纳入单一网络，并以LLM作为智能路由层实现自然语言交互。具体而言，本文设计了软掩码机制$\text{mask}=\tanh(\xi/0.05)^2$，将三大模型的扩散系数统一为$a=(1-\text{mask})\sigma^2 S^{2\beta}+\text{mask}\cdot v S^2$，实现模型间的连续插值，使网络在BSM/CEV和Heston之间平滑过渡，避免了硬切换带来的梯度不连续问题。在输出参数化方面，以Black-Scholes解析解$V_\text{BS}$为基线，网络输出$V=V_\text{BS}+K\cdot\text{net}(x)$，解决了乘法参数化在深度虚值区域$V_\text{BS}\to 0$时的退化问题，同时提供良好的初始化。对Heston模型采用ICPINN硬约束技术，确保终值条件精确满足。在交互层面，将DeepSeek LLM与统一PINN求解器结合，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，降低期权定价工具的使用门槛。
+本文的研究目标是构建一个基于PINN与LLM的统一期权定价框架，通过统一PDE算子将BSM、CEV、Heston三大模型纳入单一网络，并以LLM作为智能路由层实现自然语言交互。具体而言，本文的主要贡献如下。
+
+在统一PDE算子方面，本文设计了软掩码机制$\text{mask}=\tanh(\xi/0.05)^2$，将三大模型的扩散系数统一为$a=(1-\text{mask})\sigma^2 S^{2\beta}+\text{mask}\cdot v S^2$，实现模型间的连续插值，使网络在BSM/CEV和Heston之间平滑过渡，避免了硬切换带来的梯度不连续问题。在输出参数化方面，以Black-Scholes解析解$V_\text{BS}$为基线，网络输出$V=V_\text{BS}+K\cdot\text{net}(x)$，解决了乘法参数化在深度虚值区域$V_\text{BS}\to 0$时的退化问题，同时提供良好的初始化。对Heston模型采用ICPINN硬约束技术，确保终值条件精确满足。在交互层面，将DeepSeek LLM与统一PINN求解器结合，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，降低期权定价工具的使用门槛。
 
 实验方面，本文在BSM（MAE=0.021，ATM相对误差0.21\%）、CEV（MAE=0.065，ATM相对误差0.81\%）和Heston（MAE=0.034，ATM相对误差0.38\%）上验证了统一框架的有效性，并在真实SPY期权市场数据（748个合约，8个到期日）上进行了回测验证。消融实验系统验证了软掩码、加法参数化和数据锚点三个核心组件的必要性，为统一框架的设计选择提供了实验依据。
 
