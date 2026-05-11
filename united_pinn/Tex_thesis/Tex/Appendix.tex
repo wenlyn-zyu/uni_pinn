@@ -1,22 +1,208 @@
-\chapter{中国科学院大学学位论文撰写要求}
+\chapter{代码架构与关键实现}\label{app:code}
 
-学位论文是研究生科研工作成果的集中体现，是评判学位申请者学术水平、授予其学位的主要依据，是科研领域重要的文献资料。根据《科学技术报告、学位论文和学术论文的编写格式》（GB/T 7713-1987）、《学位论文编写规则》（GB/T 7713.1-2006）和《文后参考文献著录规则》（GB7714—87）等国家有关标准，结合中国科学院大学（以下简称“国科大”）的实际情况，特制订本规定。
+本附录介绍统一PINN期权定价系统的代码架构和关键模块的实现细节，供读者复现实验结果参考。
 
-\section{论文无附录者无需附录部分}
+\section{项目目录结构}
 
-\section{测试公式编号} \label{sec:testmath}
+系统代码组织如下：
 
-\begin{equation} \label{eq:appedns}
-    \begin{cases}
-        \frac{\partial \rho}{\partial t} + \nabla\cdot(\rho\Vector{V}) = 0 \ \mathrm{times\ font\ test}\\
-        \frac{\partial (\rho\Vector{V})}{\partial t} + \nabla\cdot(\rho\Vector{V}\Vector{V}) = \nabla\cdot\Tensor{\sigma} \ \text{times font test}\\
-        \frac{\partial (\rho E)}{\partial t} + \nabla\cdot(\rho E\Vector{V}) = \nabla\cdot(k\nabla T) + \nabla\cdot(\Tensor{\sigma}\cdot\Vector{V})
-    \end{cases}
-\end{equation}
+\begin{verbatim}
+united_pinn/
+├── unified_pinn.py          # 统一PINN核心模型
+├── llm_router.py            # LLM路由层
+├── reference_solvers.py     # 参考解（BSM/CEV/Heston）
+├── train.py                 # 训练脚本
+├── evaluate.py              # 评估脚本
+├── utils.py                 # 工具函数（归一化、采样等）
+└── configs/
+    └── default.yaml         # 超参数配置文件
+\end{verbatim}
+
+\section{统一PINN核心模型}
+
+\subsection{网络定义伪代码}
+
+\begin{verbatim}
+class UnifiedPINN(nn.Module):
+    输入维度: 9 (S/Smax, v/vmax, t/T, sigma, beta,
+                  kappa, theta, xi, rho)
+    网络结构: 6层全连接, 每层128神经元, tanh激活
+    最后一层: 权重初始化 N(0, 0.001^2), 偏置=0
+
+    前向传播 forward(S, v, t, lambda):
+        # 1. 归一化输入
+        x = [S/300, v/1, t/T, sigma, beta,
+             kappa, theta, xi, rho]
+
+        # 2. 计算软掩码
+        mask = tanh(xi / 0.05)^2
+
+        # 3. 计算等效波动率
+        sigma_eff = (1-mask)*sigma + mask*sqrt(v)
+
+        # 4. 计算BS基线（解析公式）
+        V_BS = black_scholes(S, K, tau, r, sigma_eff)
+
+        # 5. 网络修正量
+        net_out = MLP(x)  # 6层全连接
+
+        # 6. 加法参数化输出
+        V_hat = V_BS + K * net_out
+        return V_hat
+\end{verbatim}
+
+\subsection{统一PDE残差计算伪代码}
+
+\begin{verbatim}
+def compute_pde_residual(model, S, v, t, lambda):
+    # 使用自动微分计算偏导数
+    V = model(S, v, t, lambda)
+
+    dV_dt  = autograd(V, t)
+    dV_dS  = autograd(V, S)
+    d2V_dS2 = autograd(dV_dS, S)
+    dV_dv  = autograd(V, v)
+    d2V_dv2 = autograd(dV_dv, v)
+    d2V_dSdv = autograd(dV_dS, v)
+
+    # 软掩码
+    mask = tanh(xi / 0.05)^2
+
+    # 统一系数
+    a = (1-mask)*sigma^2*S^(2*beta) + mask*v*S^2
+    b = mask * rho * xi * v * S
+    c = mask * xi^2 * v
+    d = mask * kappa * (theta - v)
+
+    # 统一PDE算子
+    F = (dV_dt
+         + 0.5*a*d2V_dS2
+         + b*d2V_dSdv
+         + 0.5*c*d2V_dv2
+         + r*S*dV_dS
+         + d*dV_dv
+         - r*V)
+
+    # 相对归一化残差
+    residual = F / (|V| + 1)
+    return mean(residual^2)
+\end{verbatim}
+
+\section{LLM路由层实现}
+
+\subsection{系统提示词}
+
+LLM路由层使用以下系统提示词（英文，以提高LLM的理解准确率）：
+
+\begin{verbatim}
+You are an option pricing parameter extractor.
+Extract parameters from user input and output JSON.
+
+Rules for model selection:
+- If user mentions "Heston", "stochastic volatility",
+  "vol-of-vol", kappa/theta/xi/rho: use "heston"
+- If user mentions "CEV", "constant elasticity",
+  "beta": use "cev"
+- Otherwise: use "bsm"
+
+Default values if not specified:
+S=100, K=100, T=1.0, r=0.05, sigma=0.2,
+beta=0.5, v0=0.04, kappa=2.0, theta=0.04,
+xi=0.3, rho=-0.7
+
+Output format (JSON only, no explanation):
+{
+  "model": "bsm"|"cev"|"heston",
+  "option_type": "call"|"put",
+  "S": float, "K": float, "T": float, "r": float,
+  "sigma": float, "beta": float,
+  "v0": float, "kappa": float, "theta": float,
+  "xi": float, "rho": float
+}
+\end{verbatim}
+
+\subsection{参数校验伪代码}
+
+\begin{verbatim}
+def validate_params(params):
+    # 范围校验与截断
+    params["sigma"] = clip(params["sigma"], 0.01, 2.0)
+    params["beta"]  = clip(params["beta"],  0.1,  1.0)
+    params["kappa"] = clip(params["kappa"], 0.1, 10.0)
+    params["theta"] = clip(params["theta"], 0.001, 1.0)
+    params["xi"]    = clip(params["xi"],    0.01,  2.0)
+    params["rho"]   = clip(params["rho"],  -0.99,  0.99)
+    params["v0"]    = clip(params["v0"],    0.001, 1.0)
+    params["T"]     = clip(params["T"],     0.01, 10.0)
+    params["S"]     = clip(params["S"],     1.0, 1000.0)
+    params["K"]     = clip(params["K"],     1.0, 1000.0)
+    return params
+\end{verbatim}
+
+\section{参考解实现}
+
+\subsection{BSM解析解}
+
+\begin{verbatim}
+def black_scholes(S, K, tau, r, sigma, option_type):
+    if tau <= 0:
+        if option_type == "call":
+            return max(S - K, 0)
+        else:
+            return max(K - S, 0)
+
+    d1 = (log(S/K) + (r + 0.5*sigma^2)*tau) \
+         / (sigma * sqrt(tau))
+    d2 = d1 - sigma * sqrt(tau)
+
+    if option_type == "call":
+        return S*N(d1) - K*exp(-r*tau)*N(d2)
+    else:
+        return K*exp(-r*tau)*N(-d2) - S*N(-d1)
+\end{verbatim}
+
+\subsection{Heston半解析解（特征函数方法）}
+
+Heston模型的欧式看涨期权价格通过特征函数方法计算：
 \begin{equation}
-    \frac{\partial }{\partial t}\int\limits_{\Omega} u \, \mathrm{d}\Omega + \int\limits_{S} \unitVector{n}\cdot(u\Vector{V}) \, \mathrm{d}S = \dot{\phi}
+  V_\text{Heston} = S\cdot P_1 - Ke^{-rT}\cdot P_2,
 \end{equation}
+其中$P_1$和$P_2$通过Gil-Pelaez反演公式计算：
+\begin{equation}
+  P_j = \frac{1}{2} + \frac{1}{\pi}\int_0^\infty
+    \text{Re}\!\left[\frac{e^{-i\phi\ln K}\,\varphi_j(\phi)}{i\phi}\right]d\phi,
+    \quad j=1,2,
+\end{equation}
+其中$\varphi_j(\phi)$为Heston模型的特征函数，具体形式见Heston（1993）原文。数值积分使用高斯-勒让德求积，积分上限截断为500，节点数为200，精度约$10^{-4}$。
 
-\section{测试生僻字}
+\section{训练配置}
 
-霜蟾盥薇曜灵霜颸妙鬘虚霩淩澌菀枯菡萏泬寥窅冥毰毸濩落霅霅便嬛岧峣瀺灂姽婳愔嫕飒纚棽俪緸冤莩甲摛藻卮言倥侗椒觞期颐夜阑彬蔚倥偬澄廓簪缨陟遐迤逦缥缃鹣鲽憯懔闺闼璀错媕婀噌吰澒洞阛闠覼缕玓瓑逡巡諓諓琭琭瀌瀌踽踽叆叇氤氲瓠犀流眄蹀躞赟嬛茕頔璎珞螓首蘅皋惏悷缱绻昶皴皱颟顸愀然菡萏卑陬纯懿犇麤掱暒 墌墍墎墏墐墒墒墓墔墕墖墘墖墚墛坠墝增墠墡墢墣墤墥墦墧墨墩墪樽墬墭堕墯墰墱墲坟墴墵垯墷墸墹墺墙墼墽垦墿壀壁壂壃壄壅壆坛壈壉壊垱壌壍埙壏壐壑壒压壔壕壖壗垒圹垆壛壜壝垄壠壡坜壣壤壥壦壧壨坝塆圭嫶嫷嫸嫹嫺娴嫼嫽嫾婳妫嬁嬂嬃嬄嬅嬆嬇娆嬉嬊娇嬍嬎嬏嬐嬑嬒嬓嬔嬕嬖嬗嬘嫱嬚嬛嬜嬞嬟嬠嫒嬢嬣嬥嬦嬧嬨嬩嫔嬫嬬奶嬬嬮嬯婴嬱嬲嬳嬴嬵嬶嬷婶嬹嬺嬻嬼嬽嬾嬿孀孁孂娘孄孅孆孇孆孈孉孊娈孋孊孍孎孏嫫婿媚嵭嵮嵯嵰嵱嵲嵳嵴嵵嵶嵷嵸嵹嵺嵻嵼嵽嵾嵿嶀嵝嶂嶃崭嶅嶆岖嶈嶉嶊嶋嶌嶍嶎嶏嶐嶑嶒嶓嵚嶕嶖嶘嶙嶚嶛嶜嶝嶞嶟峤嶡峣嶣嶤嶥嶦峄峃嶩嶪嶫嶬嶭崄嶯嶰嶱嶲嶳岙嶵嶶嶷嵘嶹岭嶻屿岳帋巀巁巂巃巄巅巆巇巈巉巊岿巌巍巎巏巐巑峦巓巅巕岩巗巘巙巚帠帡帢帣帤帨帩帪帬帯帰帱帲帴帵帷帹帺帻帼帽帾帿幁幂帏幄幅幆幇幈幉幊幋幌幍幎幏幐幑幒幓幖幙幚幛幜幝幞帜幠幡幢幤幥幦幧幨幩幪幭幮幯幰幱庍庎庑庖庘庛庝庠庡庢庣庤庥庨庩庪庬庮庯庰庱庲庳庴庵庹庺庻庼庽庿廀厕廃厩廅廆廇廋廌廍庼廏廐廑廒廔廕廖廗廘廙廛廜廞庑廤廥廦廧廨廭廮廯廰痈廲廵廸廹廻廼廽廿弁弅弆弇弉弖弙弚弜弝弞弡弢弣弤弨弩弪弫弬弭弮弰弲弪弴弶弸弻弼弽弿彖彗彘彚彛彜彝彞彟彴彵彶彷彸役彺彻彽彾佛徂徃徆徇徉后徍徎徏径徒従徔徕徖徙徚徛徜徝从徟徕御徢徣徤徥徦徧徨复循徫旁徭微徯徰徱徲徳徴徵徶德徸彻徺忁忂惔愔忇忈忉忔忕忖忚忛応忝忞忟忪挣挦挧挨挩挪挫挬挭挮挰掇授掉掊掋掍掎掐掑排掓掔掕挜掚挂掜掝掞掟掠采探掣掤掦措掫掬掭掮掯掰掱掲掳掴掵掶掸掹掺掻掼掽掾掿拣揁揂揃揅揄揆揇揈揉揊揋揌揍揎揑揓揔揕揖揗揘揙揤揥揦揧揨揫捂揰揱揲揳援揵揶揷揸揻揼揾揿搀搁搂搃搄搅搇搈搉搊搋搌搎搏搐搑搒摓摔摕摖摗摙摚摛掼摝摞摠摡斫斩斮斱斲斳斴斵斶斸旪旫旮旯晒晓晔晕晖晗晘晙晛晜晞晟晠晡晰晣晤晥晦晧晪晫晬晭晰晱晲晳晴晵晷晸晹晻晼晽晾晿暀暁暂暃暄暅暆暇晕晖暊暋暌暍暎暏暐暑暒暓暔暕暖暗旸暙暚暛暜暝暞暟暠暡暣暤暥暦暧暨暩暪暬暭暮暯暰昵暲暳暴暵暶暷暸暹暺暻暼暽暾暿曀曁曂曃晔曅曈曊曋曌曍曎曏曐曑曒曓曔曕曗曘曙曚曛曜曝曞曟旷曡曢曣曤曥曦曧昽曩曪曫晒曭曮曯椗椘椙椚椛検椝椞椟椠椡椢椣椤椥椦椧椨椩椪椫椬椭椮椯椰椱椲椳椴椵椶椷椸椹椺椻椼椽椾椿楀楁楂楃楅楆楇楈楉杨楋楌楍榴榵榶榷榸榹榺榻榼榽榾桤槀槁槂盘槄槅槆槇槈槉槊构槌枪槎槏槐槑槒杠槔槕槖槗滙滛滜滝滞滟滠滢滣滦滧滪滫沪滭滮滰滱渗滳滵滶滹滺浐滼滽漀漃漄漅漈漉溇漋漌漍漎漐漑澙熹漗漘漙沤漛漜漝漞漟漡漤漥漦漧漨漪渍漭漮漯漰漱漳漴溆漶漷漹漺漻漼漽漾浆潀颍潂潃潄潅潆潇潈潉潊潋潌潍潎潏潐潒潓洁潕潖潗潘沩潚潜潝潞潟潠潡潢潣润潥潦潧潨潩潪潫潬潭浔溃潱潲潳潴潵潶滗潸潹潺潻潼潽潾涠澁澄澃澅浇涝澈澉澊澋澌澍澎澏湃澐澑澒澓澔澕澖涧澘澙澚澛澜澝澞澟渑澢澣泽浍澯澰淀澲澳澴澵澶澷澸潇潆瀡瀢瀣瀤瀥潴泷濑瀩瀪瀫瀬瀭瀮瀯弥瀱潋瀳瀴瀵瀶瀷瀸瀹瀺瀻瀼瀽澜瀿灀灁瀺灂沣滠灅灆灇灈灉灊灋灌灍灎灏灐洒灒灓漓灖灗滩灙灚灛灜灏灞灟灠灡灢湾滦灥灦灧灨灪燝燞燠燡燢燣燤燥灿燧燨燩燪燫燮燯燰燱燲燳烩燵燵燸燹燺薰燽焘燿爀爁爂爃爄爅爇爈爉爊爋爌烁爎爏爑爒爓爔爕爖爗爘爙爚烂爜爝爞爟爠爡爢爣爤爥爦爧爨爩猽猾獀犸獂獆獇獈獉獊獋獌獍獏獐獑獒獓獔獕獖獗獘獙獚獛獜獝獞獟獠獡獢獣獤獥獦獧獩狯猃獬獭狝獯狞獱獳獴獶獹獽獾獿猡玁玂玃。
+表~\ref{tab:train_config}列出了完整的训练配置，供复现实验参考。
+
+\begin{table}[htbp]
+  \centering
+  \caption{统一PINN完整训练配置}
+  \label{tab:train_config}
+  \begin{tabular}{ll}
+    \hline
+    配置项 & 取值 \\
+    \hline
+    随机种子 & 42 \\
+    训练设备 & NVIDIA GPU（CUDA）\\
+    批大小（配点数$N_c$） & 3000（每模型1000）\\
+    边界点数$N_b$ & 300 \\
+    数据锚点数$N_d$ & 60（每模型20）\\
+    优化器 & Adam（$\beta_1=0.9$，$\beta_2=0.999$）\\
+    初始学习率 & $1\times 10^{-3}$ \\
+    学习率调度 & StepLR，每5000步$\times 0.5$ \\
+    总训练步数 & 20000 \\
+    损失权重$(w_\text{pde},w_\text{bc},w_\text{data})$ & $(1, 10, 100)$ \\
+    软掩码阈值 & 0.05 \\
+    最后一层初始化 & $\mathcal{N}(0, 0.001^2)$ \\
+    BSM参数范围（训练） & $\sigma\in[0.1,0.5]$ \\
+    CEV参数范围（训练） & $\sigma\in[0.1,0.5]$，$\beta\in[0.3,0.9]$ \\
+    Heston参数范围（训练） & $\kappa\in[1,5]$，$\theta\in[0.01,0.09]$，\\
+                           & $\xi\in[0.1,0.5]$，$\rho\in[-0.9,-0.3]$ \\
+    \hline
+  \end{tabular}
+\end{table}

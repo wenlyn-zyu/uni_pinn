@@ -1,32 +1,77 @@
 \chapter*{符号列表}
 \chaptermark{符号列表}
 
-\section*{字符}
-\nomenclatureitem[\textbf{Unit}]{\textbf{Symbol}}{\textbf{Description}}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2} \cdot K^{-1}}$]{$R$}{the gas constant}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2} \cdot K^{-1}}$]{$C_v$}{specific heat capacity at constant volume}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2} \cdot K^{-1}}$]{$C_p$}{specific heat capacity at constant pressure}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2}}$]{$E$}{specific total energy}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2}}$]{$e$}{specific internal energy}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2}}$]{$h_T$}{specific total enthalpy}
-\nomenclatureitem[$\Unit{m^{2} \cdot s^{-2}}$]{$h$}{specific enthalpy}
-\nomenclatureitem[$\Unit{kg \cdot m \cdot s^{-3} \cdot K^{-1}}$]{$k$}{thermal conductivity}
-\nomenclatureitem[$\Unit{kg \cdot m^{-1} \cdot s^{-2}}$]{$S_{ij}$}{deviatoric stress tensor}
-\nomenclatureitem[$\Unit{kg \cdot m^{-1} \cdot s^{-2}}$]{$\tau_{ij}$}{viscous stress tensor}
-\nomenclatureitem[$\Unit{1}$]{$\delta_{ij}$}{Kronecker tensor}
-\nomenclatureitem[$\Unit{1}$]{$I_{ij}$}{identity tensor}
+\section*{状态变量}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$S$}{标的资产（股票）当前价格}
+\nomenclatureitem{$V(S,t)$}{欧式期权价值（BSM/CEV模型）}
+\nomenclatureitem{$V(S,v,t)$}{欧式期权价值（Heston模型）}
+\nomenclatureitem{$v$}{瞬时方差（Heston模型中的随机波动率状态变量）}
+\nomenclatureitem{$t$}{当前时刻}
+\nomenclatureitem{$T$}{期权到期时刻}
+\nomenclatureitem{$\tau = T - t$}{剩余到期时间}
 
-\section*{算子}
-\nomenclatureitem{\textbf{Symbol}}{\textbf{Description}}
-\nomenclatureitem{$\Delta$}{difference}
-\nomenclatureitem{$\nabla$}{gradient operator}
-\nomenclatureitem{$\delta^{\pm}$}{upwind-biased interpolation scheme}
+\section*{期权合约参数}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$K$}{期权执行价（Strike Price）}
+\nomenclatureitem{$r$}{无风险利率（连续复利）}
+
+\section*{BSM模型参数}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$\sigma$}{标的资产的常数波动率（BSM）或尺度参数（CEV）}
+\nomenclatureitem{$\mu$}{标的资产的漂移率}
+\nomenclatureitem{$W_t$}{标准布朗运动}
+
+\section*{CEV模型参数}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$\beta$}{弹性参数，控制波动率对股价的依赖程度；$\beta=1$退化为BSM，$\beta<1$产生杠杆效应}
+
+\section*{Heston模型参数}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$\kappa$}{方差过程的均值回归速度，$\kappa>0$}
+\nomenclatureitem{$\theta$}{方差过程的长期均值（长期方差）}
+\nomenclatureitem{$\xi$}{方差过程的波动率（vol-of-vol）}
+\nomenclatureitem{$\rho$}{股价布朗运动$W_t^S$与方差布朗运动$W_t^v$的相关系数，$\rho\in(-1,1)$}
+\nomenclatureitem{$v_0$}{初始瞬时方差}
+\nomenclatureitem{$W_t^S$}{驱动股价过程的标准布朗运动}
+\nomenclatureitem{$W_t^v$}{驱动方差过程的标准布朗运动}
+
+\section*{统一PINN框架符号}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{$\boldsymbol{\lambda}$}{模型参数向量$(\sigma,\beta,\kappa,\theta,\xi,\rho)$}
+\nomenclatureitem{$\mathcal{F}[\cdot]$}{统一PDE算子}
+\nomenclatureitem{$\text{mask}$}{软掩码$\tanh(\xi/0.05)^2$，用于在BSM/CEV与Heston之间连续插值}
+\nomenclatureitem{$\sigma_\text{eff}$}{等效波动率，用于加法参数化中的Black-Scholes基线计算}
+\nomenclatureitem{$V_\text{BS}$}{Black-Scholes解析解，作为加法参数化的基线}
+\nomenclatureitem{$\hat{V}$}{统一PINN的期权价格预测值}
+\nomenclatureitem{$\text{net}(x)$}{神经网络输出的修正量（以$K$为单位）}
+\nomenclatureitem{$\mathcal{L}$}{总损失函数}
+\nomenclatureitem{$\mathcal{L}_\text{pde}$}{PDE残差损失}
+\nomenclatureitem{$\mathcal{L}_\text{bc}$}{边界条件损失}
+\nomenclatureitem{$\mathcal{L}_\text{data}$}{数据驱动锚点损失}
+\nomenclatureitem{$w_\text{pde},w_\text{bc},w_\text{data}$}{各损失项的权重系数}
+\nomenclatureitem{$N_c$}{每训练步的PDE配点数}
+\nomenclatureitem{$N_b$}{边界条件采样点数}
+\nomenclatureitem{$N_d$}{数据锚点数}
+\nomenclatureitem{$\Phi(\cdot)$}{标准正态累积分布函数}
+
+\section*{评估指标}
+\nomenclatureitem{\textbf{符号}}{\textbf{含义}}
+\nomenclatureitem{MAE}{平均绝对误差（Mean Absolute Error）}
+\nomenclatureitem{RMSE}{均方根误差（Root Mean Square Error）}
+\nomenclatureitem{RelMAE$_\text{ATM}$}{平值附近区域的平均相对误差}
 
 \section*{缩写}
-\nomenclatureitem{CFD}{Computational Fluid Dynamics}
-\nomenclatureitem{CFL}{Courant-Friedrichs-Lewy}
-\nomenclatureitem{EOS}{Equation of State}
-\nomenclatureitem{JWL}{Jones-Wilkins-Lee}
-\nomenclatureitem{WENO}{Weighted Essentially Non-oscillatory}
-\nomenclatureitem{ZND}{Zel'dovich-von Neumann-Doering}
-
+\nomenclatureitem{\textbf{缩写}}{\textbf{全称}}
+\nomenclatureitem{BSM}{Black-Scholes-Merton模型}
+\nomenclatureitem{CEV}{Constant Elasticity of Variance，常弹性方差模型}
+\nomenclatureitem{PINN}{Physics-Informed Neural Network，物理信息神经网络}
+\nomenclatureitem{ICPINN}{Improved Constrained PINN，改进约束物理信息神经网络}
+\nomenclatureitem{LLM}{Large Language Model，大语言模型}
+\nomenclatureitem{PDE}{Partial Differential Equation，偏微分方程}
+\nomenclatureitem{ATM}{At-The-Money，平值期权（$S\approx K$）}
+\nomenclatureitem{OTM}{Out-of-The-Money，虚值期权（看涨期权$S<K$）}
+\nomenclatureitem{ITM}{In-The-Money，实值期权（看涨期权$S>K$）}
+\nomenclatureitem{CIR}{Cox-Ingersoll-Ross过程，用于Heston模型的方差过程}
+\nomenclatureitem{FFT}{Fast Fourier Transform，快速傅里叶变换}
+\nomenclatureitem{API}{Application Programming Interface，应用程序接口}
