@@ -1,0 +1,1 @@
+from .fully_parametric_pinn import FullyParametricPINN, FullyParametricNet
