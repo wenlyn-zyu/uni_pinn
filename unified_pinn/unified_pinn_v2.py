@@ -81,6 +81,37 @@ def _bs_call(S, K, tau, r, sigma):
 
 
 # ---------------------------------------------------------------------------
+# CEV analytical solution (Schroder 1989, non-central chi-squared)
+# ---------------------------------------------------------------------------
+
+def cev_schroder_call(S, K, T, r, sigma, beta):
+    """CEV European call via non-central chi-squared (Schroder 1989).
+    Valid for beta < 1. Falls back to BS when beta ≈ 1.
+
+    Formula:
+      C = S · [1 - ncx2.cdf(λ·K^{2δ}; 2+1/δ, λ·S^{2δ}·e^{2rδT})]
+          - K·e^{-rT} · ncx2.cdf(λ·S^{2δ}·e^{2rδT}; 1/δ, λ·K^{2δ})
+    where δ = 1-β, λ = 2r/(σ²·δ·(e^{2rδT}-1)).
+    """
+    from scipy.stats import ncx2
+    if abs(beta - 1.0) < 1e-9:
+        from scipy.stats import norm
+        sqt = sigma * np.sqrt(max(T, 1e-10))
+        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / sqt
+        d2 = d1 - sqt
+        return float(max(S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2), 0.0))
+    delta = 1.0 - beta
+    nu    = 1.0 / delta
+    lam   = (2.0 * r) / (sigma**2 * delta * (np.exp(2.0 * r * delta * T) - 1.0))
+    x     = lam * S**(2.0 * delta) * np.exp(2.0 * r * delta * T)
+    y     = lam * K**(2.0 * delta)
+    d     = 2.0 + nu
+    call  = (S * (1.0 - ncx2.cdf(y, df=d,   nc=x))
+             - K * np.exp(-r * T) * ncx2.cdf(x, df=d - 2, nc=y))
+    return float(max(call, max(S - K * np.exp(-r * T), 0.0)))
+
+
+# ---------------------------------------------------------------------------
 # Network
 # ---------------------------------------------------------------------------
 
@@ -96,8 +127,9 @@ class UnifiedNet(nn.Module):
         layers.append(last)
         self.net = nn.Sequential(*layers)
 
-    def forward(self, S_n, v_n, t_n, lam, S_raw, t_raw, K, T, r):
+    def forward(self, S_n, v_n, t_n, lam, S_raw, t_raw, K, T, r, return_raw=False):
         sigma = lam[:, 0:1]
+        beta  = lam[:, 1:2]
         xi    = lam[:, 4:5]
         mask      = torch.tanh(xi / 0.05) ** 2
         v_approx  = torch.clamp(v_n, min=1e-6)
@@ -106,7 +138,12 @@ class UnifiedNet(nn.Module):
         V_bs  = _bs_call(S_raw, K, tau, r, sigma_eff)
         x   = torch.cat([S_n, v_n, t_n, lam], dim=1)
         raw = self.net(x)
-        return torch.clamp(V_bs + K * raw, min=0.0)
+        # For BSM models (xi=0, beta=1): force raw->0 to preserve analytical Vega.
+        # BS base function is exact for BSM, so no network correction is needed.
+        is_bsm = (xi.abs() < 1e-9) & ((beta - 1.0).abs() < 1e-9)
+        raw = raw * (1.0 - is_bsm.float() * 0.99)
+        V = torch.clamp(V_bs + K * raw, min=0.0)
+        return (V, raw) if return_raw else V
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +302,30 @@ class UnifiedPINN:
         rel_err = (pred - V_t) / (V_t.abs() + K * 0.1)
         return torch.mean(rel_err**2)
 
+    def _bsm_raw_loss(self, n_per_model: int = 1000):
+        """Penalize non-zero network raw output for BSM models.
+
+        For BSM (xi=0, beta=1), the BS base function is exact, so the network
+        correction `raw` should be zero.  Non-zero raw destroys Vega accuracy.
+        """
+        M = len(self.param_list)
+        n = n_per_model
+        K, T, S_max, v_max, r = self.K, self.T, self.S_max, self.v_max, self.r
+
+        S_b = self._to(torch.FloatTensor(M * n, 1).uniform_(0.01, S_max))
+        v_b = self._to(torch.FloatTensor(M * n, 1).uniform_(1e-4, v_max))
+        t_b = self._to(torch.FloatTensor(M * n, 1).uniform_(0.0, T * 0.999))
+        lam = self._lam_all.unsqueeze(1).expand(M, n, 6).reshape(M * n, 6)
+
+        _, raw = self.net(S_b/S_max, v_b/v_max, t_b/T, lam, S_b, t_b, K, T, r,
+                          return_raw=True)
+
+        # Identify BSM rows: xi==0 and beta==1
+        bsm_mask = (lam[:, 4] == 0) & (lam[:, 1] == 1.0)
+        if bsm_mask.any():
+            return torch.mean(raw[bsm_mask]**2)
+        return torch.tensor(0.0, device=self.device)
+
     def _boundary_loss(self, n_per_model: int = 500):
         """Boundary condition loss -- two batched forward passes (S=0, S=S_max)."""
         M = len(self.param_list)
@@ -292,7 +353,9 @@ class UnifiedPINN:
 
     def train(self, epochs: int = 30000, n_per_model: int = 5000,
               w_pde: float = 1.0, w_bc: float = 10.0, w_ic: float = 10.0,
-              w_data: float = 100.0, log_every: int = 500):
+              w_data: float = 100.0, w_bsm_raw: float = 0.0,
+              log_every: int = 500,
+              save_every: int = 0, save_path: str = None):
         from tqdm import tqdm
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=epochs, eta_min=1e-5
@@ -311,8 +374,10 @@ class UnifiedPINN:
             loss_bc   = self._boundary_loss()
             loss_ic   = self._ic_loss()
             loss_data = self._data_loss()
+            loss_bsm_raw = self._bsm_raw_loss()
             loss      = (w_pde * loss_pde + w_bc * loss_bc
-                         + w_ic * loss_ic + w_data * loss_data)
+                         + w_ic * loss_ic + w_data * loss_data
+                         + w_bsm_raw * loss_bsm_raw)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.net.parameters(), max_norm=1.0)
@@ -333,6 +398,11 @@ class UnifiedPINN:
                     pde=f"{loss_pde.item():.3e}",
                     ic=f"{loss_ic.item():.3e}",
                 )
+            if save_every > 0 and save_path and epoch % save_every == 0:
+                ckpt_path = save_path.replace(".pt", f"_e{epoch}.pt")
+                torch.save({"state_dict": self.net.state_dict(),
+                             "epoch": epoch, "optimizer": self.optimizer.state_dict()},
+                            ckpt_path)
         return history
 
     def price(self, p: ModelParams, S: float,

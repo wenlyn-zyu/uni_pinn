@@ -1,0 +1,23 @@
+# Results and checkpoints (large binary files)
+results/
+!results/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Data files
+data/
+
+# Docs
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

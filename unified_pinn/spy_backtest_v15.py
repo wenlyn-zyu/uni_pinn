@@ -319,7 +319,7 @@ def main():
     print(f"  Filtered contracts: {len(df)}")
 
     # --- load PINN ---
-    from unified_pinn_v2 import ModelParams, UnifiedPINN
+    from unified_pinn_v2 import ModelParams, UnifiedPINN, cev_schroder_call
 
     param_list = []
     for sigma in [0.13, 0.15, 0.17, 0.20, 0.25, 0.30]:
@@ -360,7 +360,7 @@ def main():
 
         # --- CEV calibration ---
         sigma_cev, beta_cev = calibrate_cev(calls, S, Ks, T_val, r)
-        cev_prices = np.array([cev_call_approx(S, K, T_val, r, sigma_cev, beta_cev)
+        cev_prices = np.array([cev_schroder_call(S, K, T_val, r, sigma_cev, beta_cev)
                                for K in Ks])
 
         # --- Heston calibration (skip if T too short) ---

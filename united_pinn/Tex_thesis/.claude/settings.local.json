@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(ssh idata2 *)",
+      "Bash(ssh *)",
+      "Bash(python3 -c ' *)",
+      "Bash(py --version)",
+      "Bash(ls /c/Python* /c/Users/*/AppData/Local/Programs/Python/*/python.exe)",
+      "Bash(py -3 --version)",
+      "Bash(python3 -V)",
+      "Bash(python3 *)",
+      "Bash(py *)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where conda *)",
+      "Read(//c/Users/Lenovo/AppData/Local/Programs/**)",
+      "Read(//c/ProgramData/miniconda3/**)",
+      "Bash(/d/Anaconda/python.exe *)"
+    ]
+  }
+}
