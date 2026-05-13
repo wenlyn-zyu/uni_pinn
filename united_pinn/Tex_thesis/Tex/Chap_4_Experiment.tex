@@ -258,6 +258,98 @@ PINN-Heston的MAE显著高于校准Heston（高出3至37美元），这是本实
 
 
 
+\section{独立PINN与统一PINN精度对比}\label{sec:compare}
+
+为验证统一框架的有效性，本节在相同参数设置下对比独立PINN与统一PINN的定价精度。
+评估点取$S\in[60,160]$，共50个均匀采样点，$t=0$。
+参考解与第~\ref{sec:exp_setup}~节一致：BSM使用Black-Scholes解析解，
+CEV使用Schroder非中心卡方解析解，Heston使用GL特征函数半解析解。
+独立PINN使用与统一PINN相同的评估参数：BSM取$\sigma=0.20$，CEV取$\sigma=0.20$、$\beta=0.5$，
+Heston取$\kappa=2.0$、$\theta=0.04$、$\xi=0.3$、$\rho=-0.7$、$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。
+
+\begin{table}[htbp]
+  \centering
+  \caption{独立PINN与统一PINN精度对比（$S\in[60,160]$，$t=0$）}
+  \label{tab:compare}
+  \begin{tabular}{llccc}
+    \hline
+    方法 & 参考基准 & MAE & RMSE & RelMAE \\
+    \hline
+    独立BSM-PINN      & BS解析解       & 0.087 & 0.114 & 2.98\% \\
+    独立CEV-PINN      & Schroder解析解 & 0.102 & 0.131 & 1.88\% \\
+    独立Heston-ICPINN & GL半解析解     & 40.34 & 41.39 & 593\%$^\dagger$ \\
+    \hline
+    统一PINN（BSM）   & BS解析解       & 0.003 & 0.005 & 0.065\% \\
+    统一PINN（CEV）   & Schroder解析解 & 0.037 & 0.049 & 0.887\% \\
+    统一PINN（Heston）& GL半解析解     & 0.036 & 0.042 & 0.487\% \\
+    \hline
+  \end{tabular}
+\end{table}
+
+$^\dagger$ 独立Heston-ICPINN在统一评估参数（$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）下训练未收敛：
+Fichera退化边界条件（$v=0$处）的损失项主导训练过程，20000轮后仍未降至可接受水平。
+这与原论文参数（$\kappa=1.0$，$\xi=0.39$，$\rho=-0.93$）下的良好收敛形成对比，
+说明独立ICPINN对参数敏感，而统一PINN通过软掩码机制在同一参数集上实现了稳定收敛（RelMAE=0.49\%）。
+
+图~\ref{fig:compare}展示了BSM和CEV模型的价格曲线对比（Heston独立PINN因未收敛不纳入图示）。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{Img/eval_compare.pdf}
+  \caption{独立PINN与统一PINN价格曲线对比。实线为参考解，虚线为独立PINN，点线为统一PINN。}
+  \label{fig:compare}
+\end{figure}
+
+\section{希腊字母计算}\label{sec:greeks}
+
+PINN的一个重要优势是可通过自动微分直接计算希腊字母，无需额外推导。
+本节验证统一PINN计算的Delta、Gamma、Vega与解析/有限差分参考值的一致性。
+
+\subsection{BSM希腊字母}
+
+对BSM模型，Delta和Gamma通过对$S$的自动微分计算，Vega通过对$\sigma$的有限差分计算（步长$h=0.001$）。
+参考值为Black-Scholes解析公式。
+评估点取$S\in\{90,100,110\}$（虚值、平值、实值），$t=0$，$\sigma\in\{0.13,0.17,0.20,0.25\}$。
+
+\begin{table}[htbp]
+  \centering
+  \caption{BSM希腊字母精度（统一PINN vs 解析解，平均相对误差）}
+  \label{tab:greeks_bsm}
+  \begin{tabular}{lccc}
+    \hline
+    希腊字母 & 平均相对误差 & 最大相对误差 & 评估点数 \\
+    \hline
+    Delta & 0.03\% & 0.05\% & 12 \\
+    Gamma & 0.13\% & 0.28\% & 12 \\
+    Vega  & 0.09\% & 0.19\% & 12 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+BSM希腊字母的平均相对误差均低于0.2\%，表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
+
+\subsection{Heston希腊字母}
+
+Heston模型无简单解析希腊字母，参考值通过对GL半解析价格的中心有限差分计算。
+Delta和Gamma对$S$差分，Vega对$v_0$差分。
+评估参数：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。
+
+\begin{table}[htbp]
+  \centering
+  \caption{Heston希腊字母精度（统一PINN vs 有限差分参考解，平均相对误差）}
+  \label{tab:greeks_heston}
+  \begin{tabular}{lcc}
+    \hline
+    希腊字母 & 平均相对误差 & 说明 \\
+    \hline
+    Delta & 1.83\%  & 跨4组参数集平均 \\
+    Gamma & 11.41\% & 高$\kappa$、高$\xi$区域误差较大 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高（11.41\%），主要集中在高均值回归速度（$\kappa=5$）和高vol-of-vol（$\xi=0.5$）的极端参数区域，这些区域PDE系数变化剧烈，二阶导数的数值精度本身也受有限差分步长影响。在基准参数设置（$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）下，Delta误差约0.56\%，Gamma误差约9.93\%，与文献中同类工作的精度水平相当。
+
 \section{本章小结}\label{sec:exp_summary}
 
 本章通过系统实验验证了统一PINN框架的有效性。统一PINN（v15）在三大模型上均达到实用精度：BSM（MAE=0.021，ATM相对误差0.21\%）、CEV（MAE=0.065，ATM相对误差0.81\%）、Heston（MAE=0.034，ATM相对误差0.38\%）；相比早期版本，BSM精度提升68\%，CEV的ATM相对误差从37.95\%降至0.81\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。真实市场回测（SPY期权链，2394个合约，34个到期日）表明：校准Heston和CEV在中长期期权（$T>0.25$年）上显著优于BSM，Heston MAE最低可达BSM的32\%（Mar 19 2027：Heston 1.22 vs BSM 3.78）；PINN-BSM在训练参数范围内具有优异的泛化能力，MAE与校准BSM几乎相同（差距$<0.1$美元），验证了统一框架的参数泛化性；PINN-Heston因真实市场参数（$\kappa$可达15，$\xi$可低至0.01，$\rho$可达$-0.98$）超出v15训练范围，且受制于统一框架的网络容量瓶颈，定价误差较大，进一步的架构改进是重要的未来工作方向。

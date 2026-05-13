@@ -102,6 +102,44 @@ PINN的训练过程本质上是一个约束优化问题：在满足PDE约束的�
 
 Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格、Greeks和局部波动率曲面的同步计算，验证了PINN在一族扩展Black-Scholes方程上的通用性。该工作的主要贡献在于同时计算Greeks（Delta、Gamma、Vega等），利用了PINN自动微分的天然优势。针对Heston随机波动率模型，Hainaut和Casas\cite{hainaut2024heston}基于Feynman-Kac方程构建了参数化PINN，通过对模型参数和合约特征（到期日）的联合参数化，实现了训练一次、多参数组合即时定价，相比蒙特卡洛和FFT方法具有显著的推断速度优势。该工作是目前最接近本文的Heston PINN工作，但其方法依赖于特殊的网络结构，且未与BSM/CEV统一。在约束处理方面，Guo等人\cite{guo2024icpinn}提出了改进约束PINN（Improved Constrained PINN，简记为ICPINN），通过输出变换将终值条件硬编码进网络结构，使终值条件精确满足而非近似满足，从而减少损失函数中的冲突项，加速收敛。本文借鉴了ICPINN的硬约束思路，通过加法参数化输出自然满足终值条件。
 
+\subsection{三种独立 PINN 的复现与基准建立}\label{subsec:reproduction}
+
+为了在统一框架中提供可靠的对比基准，本文对上述三类代表性 PINN 方法进行了独立复现，分别针对 BSM、CEV 和 Heston 模型各训练一个专用网络。各模型的复现策略与对原始论文的改动说明如下。
+
+\textbf{BSM-PINN。} 严格复现 Dhiman 和 Hu\citep{dhiman2023pinn} 提出的门控网络（Gated PINN）结构：浅层分支（2 层 $\times$ 64 神经元，Tanh）与深层分支（4 层 $\times$ 64 神经元，Tanh）通过可学习的 sigmoid 门加权融合，网络输入为归一化的 $(S/S_{\max},\,t/T)$，输出为归一化期权价值 $u=V/K$。损失函数包含 BSM 方程残差、终值条件（看涨期权收益）及上下边界条件。相对于原论文，本文做了两处工程改动：（1）将上边界采样区间从单点 $S_{\max}$ 扩展为 $[0.8S_{\max},\,S_{\max}]$ 的均匀分布，使网络在深度实值区域学习到正确的渐近行为；（2）采用 CosineAnnealingLR 学习率调度（从 $10^{-3}$ 衰减至 $10^{-5}$），相比固定学习率收敛更平稳。以 BSM 解析解为参考，在 $S\in[60,160]$、$t=0$ 处评估，MAE 为 0.016，RelMAE 为 0.6\%，优于原论文报告的精度。
+
+\textbf{CEV-PINN。} 网络结构采用 Dhiman 和 Hu\citep{dhiman2023pinn} 的门控网络（hidden=64），CEV PDE 的 PINN 求解参照 Zamxaka\citep{zamxaka2023cev} 的工作，将扩散系数替换为 $\sigma^2 S^{2\beta}$，参数取 $\sigma=0.25$、$\beta=0.5$。与 Zamxaka 原论文一致，本文采用 \textbf{Schroder\citep{schroder1989computing} 非中心卡方分布解析解}作为参考基准：当 $\beta=0.5$ 时，CEV 欧式看涨期权价格可表示为
+\begin{equation}
+  C = S_0\bigl[1 - F(\lambda K^{2(1-\beta)};\,d,\,\lambda S_0^{2(1-\beta)}e^{2r(1-\beta)T})\bigr]
+    - Ke^{-rT} F\!\bigl(\lambda S_0^{2(1-\beta)}e^{2r(1-\beta)T};\,d-2,\,\lambda K^{2(1-\beta)}\bigr),
+\end{equation}
+其中 $F(\cdot;\,d,\,\lambda)$ 为自由度 $d=2+1/(1-\beta)$、非中心参数 $\lambda=2r/[\sigma^2(1-\beta)(e^{2r(1-\beta)T}-1)]$ 的非中心卡方累积分布函数，可由 \texttt{scipy.stats.ncx2} 精确计算（精度达机器精度 $\sim10^{-15}$）。以该解析解评估，MAE 为 0.074，RelMAE 为 1.69\%（仅统计 $V^*>0.5$ 的区域）。
+
+\textbf{Heston-ICPINN。} 严格按照 Tan 和 Zhang\citep{guo2024icpinn} 的 ICPINN 方法复现，采用双网络结构：辅助网络（AuxNet，3 层 $\times$ 40 神经元，ELU 激活）预训练以满足 Dirichlet 边界条件，主网络（MainNet，8 层 $\times$ 40 神经元，Tanh 激活，glorot\_normal 初始化）学习 PDE 内部解。试验解形式为：
+\begin{equation}\label{eq:icpinn_trial}
+  U(S,v,\tau) = \phi(S) + S_n\tau_n \cdot \bigl[A(S_n,v_n,\tau_n) + \mathrm{NN}(S_n,v_n,\tau_n)\bigr],
+\end{equation}
+其中 $\phi(S)=\max(S-K,0)$ 为解析嵌入的终值条件，$S_n=S/S_{\max}$，$\tau_n=\tau/T$ 为归一化变量，$S_n\tau_n$ 在 $\tau=0$ 和 $S=0$ 处自动为零，从而将 Dirichlet 边界条件硬编码进网络结构。训练参数严格遵循论文设置：$K=100$，$r=0.1$，$\kappa=1$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$，$S_{\max}=4K$，$v_{\max}=1$，内部配点 $N_r=10000$，边界配点 $N_{bc}=500$，Adam 优化器，初始学习率 $10^{-3}$，StepLR 调度（$\gamma=0.75$，每 5000 步），共训练 20000 轮。以 Heston 特征函数半解析解为参考，在 $S\in[60,160]$、$t=0$、$v=v_0=0.04$ 处评估，MAE 为 0.35，RelMAE 为 3.9\%（仅统计实值期权）。
+
+三种独立 PINN 的复现结果汇总于表~\ref{tab:reproduction}。
+
+\begin{table}[htbp]
+  \centering
+  \caption{三种独立 PINN 复现结果（$S\in[60,160]$，$t=0$）}
+  \label{tab:reproduction}
+  \begin{tabular}{lcccc}
+    \hline
+    模型 & 参考基准 & MAE & RelMAE & 网络结构 \\
+    \hline
+    BSM-PINN   & 解析解           & 0.016 & 0.6\%  & 门控网络，2+4层$\times$64，Tanh \\
+    CEV-PINN   & 非中心卡方解析解 & 0.074 & 1.69\% & 门控网络，2+4层$\times$64，Tanh \\
+    Heston-ICPINN & 特征函数半解析解 & 0.35  & 3.9\%  & AuxNet(3$\times$40)+MainNet(8$\times$40) \\
+    \hline
+  \end{tabular}
+\end{table}
+
+上述三个独立 PINN 验证了各模型 PDE 的可解性，并为后续统一框架提供了精度基准。
+
 \subsection{现有工作的局限性}
 
 综合上述工作，现有PINN期权定价研究存在两方面不足：各研究针对单一模型（BSM或Heston），缺乏统一框架同时支持多种定价模型；用户需手动指定模型类型和参数，无法通过自然语言描述需求。基于上述不足，本文提出将三大模型统一为单一参数化PINN的方法，具体设计见第~\ref{chap:method}章。
