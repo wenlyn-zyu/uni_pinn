@@ -260,12 +260,14 @@ PINN-Heston的MAE显著高于校准Heston（高出3至37美元），这是本实
 
 \section{独立PINN与统一PINN精度对比}\label{sec:compare}
 
-为验证统一框架的有效性，本节在相同参数设置下对比独立PINN与统一PINN的定价精度。
+为验证统一框架的有效性，本节对比独立PINN与统一PINN的定价精度。
 评估点取$S\in[60,160]$，共50个均匀采样点，$t=0$。
-参考解与第~\ref{sec:exp_setup}~节一致：BSM使用Black-Scholes解析解，
-CEV使用Schroder非中心卡方解析解，Heston使用GL特征函数半解析解。
-独立PINN使用与统一PINN相同的评估参数：BSM取$\sigma=0.20$，CEV取$\sigma=0.20$、$\beta=0.5$，
-Heston取$\kappa=2.0$、$\theta=0.04$、$\xi=0.3$、$\rho=-0.7$、$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。
+参考解：BSM使用Black-Scholes解析解，CEV使用Schroder非中心卡方解析解，Heston使用GL特征函数半解析解。
+
+BSM和CEV独立PINN与统一PINN使用相同参数（$\sigma=0.20$，$\beta=0.5$，$K=100$，$T=1$，$r=0.05$）。
+独立Heston-PINN严格复现Tan和Zhang\citep{guo2024icpinn}的原始参数（$r=0.1$，$\kappa=1.0$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$），
+统一PINN的Heston评估使用统一框架的训练参数（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），
+各自在其训练参数下评估，以反映各模型的实际精度水平。
 
 \begin{table}[htbp]
   \centering
@@ -275,9 +277,9 @@ Heston取$\kappa=2.0$、$\theta=0.04$、$\xi=0.3$、$\rho=-0.7$、$v_0=0.04$，$
     \hline
     方法 & 参考基准 & MAE & RMSE & RelMAE \\
     \hline
-    独立BSM-PINN      & BS解析解       & 0.087 & 0.114 & 2.98\% \\
-    独立CEV-PINN      & Schroder解析解 & 0.102 & 0.131 & 1.88\% \\
-    独立Heston-ICPINN & GL半解析解     & 40.34 & 41.39 & 593\%$^\dagger$ \\
+    独立BSM-PINN   & BS解析解       & 0.087 & 0.114 & 2.98\% \\
+    独立CEV-PINN   & Schroder解析解 & 0.102 & 0.131 & 1.88\% \\
+    独立Heston-PINN$^\dagger$ & GL半解析解 & 0.367 & 0.387 & 3.92\% \\
     \hline
     统一PINN（BSM）   & BS解析解       & 0.003 & 0.005 & 0.065\% \\
     统一PINN（CEV）   & Schroder解析解 & 0.037 & 0.049 & 0.887\% \\
@@ -286,12 +288,15 @@ Heston取$\kappa=2.0$、$\theta=0.04$、$\xi=0.3$、$\rho=-0.7$、$v_0=0.04$，$
   \end{tabular}
 \end{table}
 
-$^\dagger$ 独立Heston-ICPINN在统一评估参数（$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）下训练未收敛：
-Fichera退化边界条件（$v=0$处）的损失项主导训练过程，20000轮后仍未降至可接受水平。
-这与原论文参数（$\kappa=1.0$，$\xi=0.39$，$\rho=-0.93$）下的良好收敛形成对比，
-说明独立ICPINN对参数敏感，而统一PINN通过软掩码机制在同一参数集上实现了稳定收敛（RelMAE=0.49\%）。
+$^\dagger$ 独立Heston-PINN使用Tan和Zhang\citep{guo2024icpinn}原始参数（$r=0.1$，$\kappa=1.0$，$\xi=0.39$，$\rho=-0.93$）训练与评估，
+统一PINN使用不同的Heston参数集（$r=0.05$，$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）。
+两者参数不同，不构成直接对比，但均反映各自在训练参数下的精度水平。
 
-图~\ref{fig:compare}展示了BSM和CEV模型的价格曲线对比（Heston独立PINN因未收敛不纳入图示）。
+从表~\ref{tab:compare}可以看出，统一PINN在BSM和CEV模型上的精度显著优于对应的独立PINN：
+BSM的RelMAE从2.98\%降至0.065\%（提升约46倍），CEV从1.88\%降至0.887\%（提升约2.1倍）。
+这表明统一框架的软掩码机制不仅实现了多模型的统一求解，还通过参数共享提升了各子模型的精度。
+
+图~\ref{fig:compare}展示了三种模型的价格曲线对比。
 
 \begin{figure}[htbp]
   \centering
