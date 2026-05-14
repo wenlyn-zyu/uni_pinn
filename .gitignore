@@ -14,3 +14,5 @@ __pycache__/
 *.lot
 .claude/
 .DS_Store
+option_pinn/exploration/
+docs/

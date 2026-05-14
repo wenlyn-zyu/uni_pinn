@@ -84,13 +84,9 @@ Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定�
 \end{equation}
 其中$F(\cdot;\,d,\,\lambda)$为自由度$d=2+1/(1-\beta)$、非中心参数$\lambda=2r/[\sigma^2(1-\beta)(e^{2r(1-\beta)T}-1)]$的非中心卡方累积分布函数，可由\texttt{scipy.stats.ncx2}精确计算（精度$\sim10^{-15}$）。评估结果：MAE=0.074，RelMAE=1.69\%（仅统计$V^*>0.5$的区域）。
 
-\textbf{Heston-ICPINN。}严格按照Tan和Zhang\cite{guo2024icpinn}的ICPINN方法复现，采用双网络结构：辅助网络（AuxNet，3层$\times$40神经元，ELU激活）预训练以满足Dirichlet边界条件，主网络（MainNet，8层$\times$40神经元，Tanh激活）学习PDE内部解。试验解形式为：
-\begin{equation}\label{eq:icpinn_trial}
-  U(S,v,\tau) = \phi(S) + S_n\tau_n \cdot \bigl[A(S_n,v_n,\tau_n) + \mathrm{NN}(S_n,v_n,\tau_n)\bigr],
-\end{equation}
-其中$\phi(S)=\max(S-K,0)$为解析嵌入的终值条件，$S_n\tau_n$在$\tau=0$和$S=0$处自动为零，从而将Dirichlet边界条件硬编码进网络结构。训练参数严格遵循论文设置：$K=100$，$r=0.1$，$\kappa=1$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$，内部配点$N_r=10000$，边界配点$N_{bc}=500$，Adam优化器，初始学习率$10^{-3}$，StepLR调度（$\gamma=0.75$，每5000步），共训练20000轮。评估结果：MAE=0.35，RelMAE=3.9\%（仅统计实值期权）。
+\textbf{Hainaut \& Casas参数化PINN。}严格复现Hainaut和Casas\cite{hainaut2024heston}的参数化PINN方法，采用跳跃连接网络（SkipNet）结构：4层$\times$256神经元，每层接收前一层输出与原始输入的拼接（skip connection），输入为9维向量$(t, S, v, r, \kappa, \theta, \xi, \rho, T)$，经z-score归一化后输入网络，输出为PUT期权价格（以$K$为单位）。训练参数范围：$S\in[20,180]$，$v\in[0.032,0.52]$，$r\in[0.01,0.07]$，$\kappa\in[0.5,2.0]$，$\theta\in[0.062,0.42]$，$\xi\in[0.1,0.9]$，$\rho\in[-0.8,0.8]$，$T\in[0.1,5]$。采用4阶段Adam训练：学习率依次为$0.005/0.002/0.001/0.0001$，各阶段训练$500/1000/1000/1000$轮，内部配点$N_D=20000$，终值配点$N_T=5000$，下边界配点$N_\text{low}=5000$。该模型以PUT期权为输出，通过put-call parity转换为CALL价格。评估参数集中$\theta=0.04$略低于训练下限$0.062$，属轻微域外推断（OOD）；原论文Table~7在训练范围内评估实值PUT，报告相对误差约$4.4\%$，本文结果与之一致。
 
-然而，ICPINN方法的收敛性对参数集高度敏感。当将参数替换为统一框架所需的参数集（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$）时，训练无法收敛。根本原因在于Fichera退化边界条件（$v=0$处）：在$\kappa\theta$较小时，该边界条件的损失项主导整体损失（约为PDE残差的40倍），而aux\_net已被冻结，main\_net无法独立修正此偏差。为解决这一问题，本文在独立Heston-PINN中引入\textbf{数据锚点机制}：在$t=0$处预计算GL特征函数半解析价格作为监督信号，以权重$w_\text{data}=100$加入损失函数，将解锁定在正确分支上，从而在任意参数集下均能稳定收敛。
+然而，Hainaut \& Casas方法的参数化范围对统一框架所需的参数集（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$）存在轻微OOD问题（$\theta=0.04$低于训练下限$0.062$），且该方法仅输出PUT价格，需经put-call parity转换，在深度虚值区域引入额外误差。为解决这一问题，本文在独立Heston-PINN中引入\textbf{数据锚点机制}：在$t=0$处预计算GL特征函数半解析价格作为监督信号，以权重$w_\text{data}=100$加入损失函数，将解锁定在正确分支上，从而在任意参数集下均能稳定收敛。
 
 三种独立PINN的复现结果汇总于表~\ref{tab:reproduction}。
 
@@ -104,11 +100,11 @@ Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定�
     \hline
     BSM-PINN      & 解析解           & 0.016 & 0.6\%  & 门控网络，2+4层$\times$64，Tanh \\
     CEV-PINN      & 非中心卡方解析解 & 0.074 & 1.69\% & 门控网络，2+4层$\times$64，Tanh \\
-    Hainaut \& Casas (2024) & GL半解析解 & --- & 1.71\%* & 参数化PINN，4层$\times$40，Tanh \\
+    Hainaut \& Casas (2024) & GL半解析解 & --- & 9.169\%* & 参数化PINN，4层$\times$256，Tanh，skip connection \\
     \hline
   \end{tabular}
 
-  {\footnotesize *Hainaut模型以PUT为输出，经put-call parity转换为CALL价格，仅统计$S/K\geq 0.85$区域。}
+  {\footnotesize *Hainaut模型以PUT为输出，经put-call parity转换为CALL价格，仅统计$S/K\geq 0.85$区域（RelMAE=9.169\%）。}
 \end{table}
 
 上述三个独立PINN验证了各模型PDE的可解性，并为后续统一框架提供了精度基准。

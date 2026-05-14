@@ -27,7 +27,7 @@ K_SYN, T_SYN, r_SYN = 100.0, 1.0, 0.05
 S_GRID = np.linspace(50, 250, 50)
 
 BSM_PARAMS    = dict(sigma=0.2)
-CEV_PARAMS    = dict(sigma=0.25, beta=0.5)
+CEV_PARAMS    = dict(sigma=0.2, beta=0.5)
 # 独立 CEV PINN 实际训练参数（从 checkpoint 读取）
 CEV_INDEP     = dict(sigma=0.2, beta=0.5)
 # Hainaut & Casas (2024) Heston PINN 评估参数（与 unified 一致，便于横向对比）
