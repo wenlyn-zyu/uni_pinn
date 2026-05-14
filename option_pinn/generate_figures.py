@@ -322,65 +322,7 @@ def fig_price_curves():
     savefig(fig, "price_curves.pdf")
 
 
-# ── 5. Error Distribution ─────────────────────────────────────────────────────
-def fig_error_dist():
-    try:
-        sys.path.insert(0, HERE)
-        from ref_solvers import bsm_call, cev_call, heston_call
-        from unified_pinn_v2 import ModelParams
-        pinn = _load_unified()
-    except Exception as e:
-        print(f"  skipping error_dist.pdf: {e}"); return
-
-    S = np.linspace(50, 250, 60)
-    K, T, r = 100., 1., 0.05
-    p_bsm    = ModelParams.from_bsm(sigma=0.20)
-    p_cev    = ModelParams.from_cev(sigma=0.20, beta=0.5)
-    p_heston = ModelParams.from_heston(kappa=2.0, theta=0.04, xi=0.3,
-                                       rho=-0.7, v0=0.04)
-    ref_bsm    = np.array([bsm_call(s, K, T, r, 0.20) for s in S])
-    ref_cev    = np.array([cev_call(s, K, T, r, 0.20, 0.5) for s in S])
-    ref_heston = np.array([heston_call(s, K, T, r, 2.0, 0.04, 0.3, -0.7, 0.04) for s in S])
-    pred_bsm    = _unified_price(pinn, S, p_bsm)
-    pred_cev    = _unified_price(pinn, S, p_cev)
-    pred_heston = _unified_price(pinn, S, p_heston)
-
-    # CEV: Schroder formula underflows to 0 for S < ~97 (deep OTM, β=0.5, σ=0.2).
-    # Mask to ref > 2.0 to skip the entire numerically unreliable transition zone.
-    configs = [
-        ("BSM",                    ref_bsm,    pred_bsm,    None,            50,  250),
-        (r"CEV ($\beta\!=\!0.5$)", ref_cev,    pred_cev,    ref_cev > 2.0,   97,  250),
-        ("Heston",                 ref_heston, pred_heston, None,            50,  250),
-    ]
-
-    fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
-    for ax, (title, ref, pred, mask, xlo, xhi) in zip(axes, configs):
-        err = np.abs(pred - ref)
-        if mask is not None:
-            S_plot, err_plot = S[mask], err[mask]
-        else:
-            S_plot, err_plot = S, err
-        ymax = max(err_plot.max() * 1.18, 0.01)
-        ax.fill_between(S_plot, err_plot, alpha=0.25, color=C1)
-        ax.plot(S_plot, err_plot, color=C1, lw=1.8, zorder=3)
-        # ATM band: only draw where it overlaps the plotted x range
-        atm_lo, atm_hi = max(80, xlo), min(120, xhi)
-        if atm_lo < atm_hi:
-            ax.axvspan(atm_lo, atm_hi, alpha=0.10, color=C3, zorder=1)
-            ax.text((atm_lo + atm_hi) / 2, ymax * 0.88, "ATM",
-                    ha="center", fontsize=8, color=C3, zorder=4)
-        ax.set_title(title, pad=6)
-        ax.set_xlabel(r"$S$")
-        ax.set_ylabel("Absolute error")
-        ax.set_ylim(0, ymax)
-        ax.grid(True, alpha=0.15, linewidth=0.5)
-        ax.set_xlim(xlo, xhi)
-
-    fig.tight_layout(pad=0.8)
-    savefig(fig, "error_dist.pdf")
-
-
-# ── 6. Comparison: Independent vs Unified ────────────────────────────────────
+# ── 5. Comparison: Independent vs Unified ────────────────────────────────────
 def fig_eval_compare():
     try:
         sys.path.insert(0, HERE)
@@ -457,6 +399,5 @@ if __name__ == "__main__":
     fig_architecture()
     fig_training_loss()
     fig_price_curves()
-    fig_error_dist()
     fig_eval_compare()
     print(f"\nDone. Output: {OUT}")
