@@ -3,7 +3,7 @@
 %---------------------------------------------------------------------------%
 \confidential{}
 \schoollogo{scale=0.2}{ShanghaiTechLogo}
-\title{基于物理信息神经网络与大语言模型的统一期权定价框架}
+\title{基于物理信息神经网络的多模型期权定价方法研究}
 \author{朱文龙}
 \ID{2022XXXXXXXX}
 \entranceYear{2022}
@@ -14,7 +14,7 @@
 \major{计算机科学与技术}
 \institute{上海科技大学信息科学与技术学院}
 \chinesedate{二零二六年~六月}
-\englishtitle{A Unified Option Pricing Framework Based on Physics-Informed Neural Networks and Large Language Models}
+\englishtitle{Multi-Model Option Pricing Based on Physics-Informed Neural Networks}
 \englishauthor{Wenlong Zhu}
 \englishadvisor{Supervisor: }
 \englishdegree{Bachelor}
@@ -37,9 +37,9 @@
 
 在LLM部分，引入DeepSeek API作为智能路由层，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，使非专业用户无需了解模型细节即可完成期权定价。
 
-实验结果表明，统一PINN在BSM模型上达到平均绝对误差（Mean Absolute Error，MAE）=0.0003（平值期权（At-The-Money，ATM）区域相对误差0.0010\%），在CEV模型上达到MAE=0.032（ATM相对误差0.79\%），在Heston模型上达到MAE=0.053（ATM相对误差0.74\%）；三种模型的ATM相对误差均低于1\%，统一框架在精度上显著优于独立训练的PINN基线。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，远低于传统有限差分法的约500ms。
+实验结果表明，统一PINN在BSM模型上达到MAE=0.0005（ATM区域相对误差0.0009\%），在CEV模型上达到MAE=0.032（ATM相对误差0.79\%），在Heston模型上达到MAE=0.102（ATM相对误差0.599\%）；三种模型的ATM相对误差均低于1\%，统一框架在BSM和CEV上的精度优于独立训练的PINN基线。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，远低于传统有限差分法的约500ms。
 
-\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；Heston模型；大语言模型；统一框架}
+\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；Heston模型；大语言模型；软掩码}
 
 %---------------------------------------------------------------------------%
 %->> 英文摘要
@@ -52,6 +52,6 @@ This paper proposes and implements a unified option pricing framework based on P
 
 In the LLM component, the DeepSeek API serves as an intelligent routing layer, achieving reliable parameter extraction and model selection through structured JSON output, supporting both Chinese and English natural language input.
 
-Experimental results show that the unified PINN achieves Mean Absolute Error (MAE) = 0.0003 on BSM (At-The-Money (ATM) relative error 0.0010\%), MAE = 0.032 on CEV (ATM relative error 0.79\%), and MAE = 0.053 on Heston (ATM relative error 0.74\%); all three models achieve ATM relative errors below 1\%, and the unified framework significantly outperforms independently trained PINN baselines. The LLM routing layer achieves 100\% model selection accuracy on 20 test cases. Single inference takes approximately 2ms, far below the approximately 500ms of traditional finite difference methods.
+Experimental results show that the unified PINN achieves MAE = 0.0005 on BSM (ATM relative error 0.0009\%), MAE = 0.032 on CEV (ATM relative error 0.79\%), and MAE = 0.102 on Heston (ATM relative error 0.599\%); all three models achieve ATM relative errors below 1\%, and the unified framework outperforms independently trained PINN baselines on BSM and CEV. The LLM routing layer achieves 100\% model selection accuracy on 20 test cases. Single inference takes approximately 2ms, far below the approximately 500ms of traditional finite difference methods.
 
-\englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; Heston Model; Large Language Models; Unified Framework}
+\englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; Heston Model; Large Language Models; Soft Mask}

@@ -145,4 +145,4 @@ Accepts natural language input (Chinese or English) and returns structured JSON 
 
 ## Reference
 
-Thesis: *A Unified Option Pricing Framework Based on Physics-Informed Neural Networks and Large Language Models*, Wenlong Zhu, ShanghaiTech University, 2026.
+Thesis: *Multi-Model Option Pricing Based on Physics-Informed Neural Networks*, Wenlong Zhu, ShanghaiTech University, 2026.
