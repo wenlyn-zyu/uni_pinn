@@ -88,7 +88,7 @@ Runs 20 test cases (10 Chinese + 10 English, covering BSM/CEV/Heston) and report
 python ablation.py --epochs 30000 --save results/ablation_results.json
 ```
 
-Trains three ablation variants (no soft mask / no additive parameterization / no data anchor) and reports BSM and Heston MAE for each. Takes ~90 min on a single GPU (3 × 30,000 steps).
+Trains three ablation variants (no soft mask / no additive parameterization / no data anchor) and reports BSM and Heston MAE for each. Takes ~7 hours on a single GPU (3 × 30,000 steps). Use `--epochs 5000` for a quick sanity check.
 
 ### Step 6 — Greeks validation
 
