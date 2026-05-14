@@ -140,7 +140,7 @@ def unified_greeks_autograd(pinn, p, S_arr):
                      lam, S_t, t_t, p.K, p.T, p.r)
         dV_dS = torch.autograd.grad(V, S_t, create_graph=True, retain_graph=True)[0]
         d2V_dS2 = torch.autograd.grad(dV_dS, S_t, retain_graph=True)[0]
-        dV_dv   = torch.autograd.grad(V, v_t, retain_graph=False)[0]
+        dV_dv   = torch.autograd.grad(V, v_t, retain_graph=True)[0]
         results.append({
             "delta": float(dV_dS.item()),
             "gamma": float(d2V_dS2.item()),
@@ -193,7 +193,7 @@ def eval_synthetic():
     heston_pinn = load_indep_heston()
 
     pred_bsm_i    = [bsm_pinn.price(S) / bsm_pinn.K    for S in S_GRID]
-    pred_cev_i    = [cev_pinn.price(S) / cev_pinn.K    for S in S_GRID]
+    pred_cev_i    = [cev_pinn.price(S) * cev_pinn.K    for S in S_GRID]
     pred_heston_i = [heston_pinn.price(S) for S in S_GRID]
     add_price("indep", pred_bsm_i, pred_cev_i, pred_heston_i, ref_heston_i)
 
