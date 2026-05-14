@@ -37,7 +37,7 @@
 
 在LLM部分，引入DeepSeek API作为智能路由层，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，使非专业用户无需了解模型细节即可完成期权定价。
 
-实验结果表明，统一PINN在BSM模型上达到MAE=0.0005（ATM区域相对误差0.0009\%），在CEV模型上达到MAE=0.032（ATM相对误差0.79\%），在Heston模型上达到MAE=0.102（ATM相对误差0.599\%）；三种模型的ATM相对误差均低于1\%，统一框架在BSM和CEV上的精度优于独立训练的PINN基线。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，远低于传统有限差分法的约500ms。
+实验结果表明，统一PINN在三种模型的平值附近区域相对误差均低于1\%，统一框架在BSM和CEV上的精度优于独立训练的PINN基线。LLM路由层在全部测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，具备实时定价能力。
 
 \keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；Heston模型；大语言模型；软掩码}
 
@@ -52,6 +52,6 @@ This paper proposes and implements a unified option pricing framework based on P
 
 In the LLM component, the DeepSeek API serves as an intelligent routing layer, achieving reliable parameter extraction and model selection through structured JSON output, supporting both Chinese and English natural language input.
 
-Experimental results show that the unified PINN achieves MAE = 0.0005 on BSM (ATM relative error 0.0009\%), MAE = 0.032 on CEV (ATM relative error 0.79\%), and MAE = 0.102 on Heston (ATM relative error 0.599\%); all three models achieve ATM relative errors below 1\%, and the unified framework outperforms independently trained PINN baselines on BSM and CEV. The LLM routing layer achieves 100\% model selection accuracy on 20 test cases. Single inference takes approximately 2ms, far below the approximately 500ms of traditional finite difference methods.
+Experimental results show that the unified PINN achieves ATM relative errors below 1\% across all three models, and outperforms independently trained PINN baselines on BSM and CEV. The LLM routing layer achieves 100\% model selection accuracy on all test cases. Single inference takes approximately 2ms, enabling real-time pricing.
 
 \englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; Heston Model; Large Language Models; Soft Mask}
