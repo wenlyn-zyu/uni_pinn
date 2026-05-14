@@ -1,0 +1,14 @@
+
+TY  - Thesis / Dissertation
+AU  - Zamxaka, Nichume
+AB  - We investigate the application of physics-informed neural networks (PINNs) to option pricing. PINNs are neural networks that are trained to numerically solve partial differential equations (PDEs) by obeying the dynamics induced by the PDE as well as the initial/terminal conditions of the PDE. They are mesh-free to an extent and compute the derivatives of the PDE through backward-propagation. We construct a PINN toy example to solve the Black-Scholes-Merton PDE for a vanilla European option. The numerical solutions from the PINN are compared against the true analytical solution – the Black-Scholes-Merton equation. The problem is also extended by incorporating a local volatility model. Here, we derive the PDE of a vanilla European option under the constant elasticity of variance (CEV) model. We then construct and train a PINN to solve the PDE and compare it to the true analytical solution of a special case of the CEV model, the square-root process. 
+DA  - 2024
+DB  - OpenUCT
+DP  - University of Cape Town
+KW  - Finance and Tax
+LK  - https://open.uct.ac.za
+PY  - 2024
+T1  - Option pricing with physics-informed neutral networks (PINNS)
+TI  - Option pricing with physics-informed neutral networks (PINNS)
+UR  - http://hdl.handle.net/11427/40675
+ER  - 

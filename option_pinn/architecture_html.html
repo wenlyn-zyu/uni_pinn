@@ -3,255 +3,237 @@
 <head>
 <meta charset="utf-8">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-    background: #f5f5f7;
-    display: flex; justify-content: center; align-items: flex-start;
-    padding: 24px;
-  }
-  .diagram {
-    width: 860px;
-    display: flex; flex-direction: column; gap: 0;
-  }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  background: #ffffff;
+  padding: 14px 20px;
+  width: 760px;
+}
 
-  /* ── Layer wrapper ── */
-  .layer {
-    display: flex; align-items: stretch; gap: 0;
-  }
-  .layer-label {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
-    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-    text-transform: uppercase; color: #86868b;
-    padding: 0 10px; min-width: 32px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .layer-body {
-    flex: 1;
-    border-radius: 18px;
-    padding: 20px 22px;
-    display: flex; align-items: center; gap: 14px;
-    position: relative;
-  }
+/* ── vertical flow ── */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
 
-  /* ── Layer colors ── */
-  .layer-interaction .layer-body { background: #f0eaff; }
-  .layer-solver      .layer-body { background: #e8f0ff; }
-  .layer-output      .layer-body { background: #e8f8ee; }
+/* ── down arrow ── */
+.down {
+  width: 2px; height: 16px; background: #94a3b8; position: relative; flex-shrink: 0;
+}
+.down::after {
+  content: ""; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 7px solid #94a3b8;
+}
 
-  /* ── Connector arrows between layers ── */
-  .connector {
-    display: flex; justify-content: center; align-items: center;
-    height: 36px; position: relative;
-  }
-  .connector::after {
-    content: "";
-    display: block;
-    width: 2px; height: 28px;
-    background: linear-gradient(to bottom, #c7c7cc, #aeaeb2);
-    position: absolute; left: 50%; transform: translateX(-50%);
-  }
-  .connector-arrow {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    bottom: 2px;
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 7px solid #aeaeb2;
-  }
+/* ── right arrow ── */
+.right {
+  width: 28px; height: 2px; background: #94a3b8; position: relative; flex-shrink: 0; align-self: center;
+}
+.right::after {
+  content: ""; position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-left: 7px solid #94a3b8;
+}
 
-  /* ── Cards ── */
-  .card {
-    background: white;
-    border-radius: 14px;
-    padding: 13px 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06);
-    display: flex; flex-direction: column; gap: 4px;
-    flex: 1;
-  }
-  .card-title {
-    font-size: 12px; font-weight: 700; letter-spacing: -0.01em;
-    color: #1d1d1f;
-  }
-  .card-sub {
-    font-size: 10.5px; color: #6e6e73; line-height: 1.4;
-    font-family: "SF Mono", "Menlo", monospace;
-  }
-  .card-sub.formula {
-    font-family: "SF Mono", "Menlo", monospace;
-    font-size: 10px; color: #3a3a3c;
-    background: #f5f5f7; border-radius: 6px;
-    padding: 3px 6px; margin-top: 2px;
-  }
+/* ── node base ── */
+.node {
+  border-radius: 9px; padding: 7px 14px; text-align: center;
+  font-size: 12px; line-height: 1.35;
+}
+.nt { font-weight: 700; font-size: 12px; }
+.ns { font-size: 10px; opacity: 0.72; font-family: "Menlo","Consolas",monospace; margin-top: 2px; }
+.ni { font-size: 9.5px; font-style: italic; margin-top: 2px; opacity: 0.65; }
 
-  /* ── Card accent colors ── */
-  .card-purple  { border-top: 3px solid #7c3aed; }
-  .card-orange  { border-top: 3px solid #f97316; }
-  .card-green   { border-top: 3px solid #16a34a; }
-  .card-blue    { border-top: 3px solid #2563eb; }
-  .card-indigo  { border-top: 3px solid #4f46e5; }
-  .card-cyan    { border-top: 3px solid #0891b2; }
-  .card-red     { border-top: 3px solid #dc2626; }
+/* ── node themes ── */
+.n-purple { background:#f3e8ff; border:1.5px solid #a855f7; color:#581c87; }
+.n-amber  { background:#fffbeb; border:1.5px solid #f59e0b; color:#78350f; }
+.n-teal   { background:#f0fdfa; border:1.5px solid #14b8a6; color:#134e4a; }
+.n-indigo { background:#eef2ff; border:1.5px solid #6366f1; color:#312e81; }
+.n-blue   { background:#eff6ff; border:1.5px solid #3b82f6; color:#1e3a8a; }
+.n-cyan   { background:#ecfeff; border:1.5px solid #06b6d4; color:#164e63; }
+.n-green  { background:#f0fdf4; border:1.5px solid #22c55e; color:#14532d; }
 
-  /* ── Inline arrow between cards ── */
-  .inline-arrow {
-    display: flex; align-items: center; color: #aeaeb2;
-    font-size: 18px; padding: 0 2px; flex-shrink: 0;
-  }
+/* ── layer 1 row ── */
+.l1-row { display: flex; align-items: center; gap: 0; }
 
-  /* ── Solver inner layout ── */
-  .solver-inner {
-    flex: 1; display: flex; flex-direction: column; gap: 10px;
-  }
-  .solver-row {
-    display: flex; align-items: stretch; gap: 10px;
-  }
-  .solver-pde {
-    background: #f0f9ff;
-    border: 1.5px dashed #0891b2;
-    border-radius: 10px;
-    padding: 9px 14px;
-    font-size: 10.5px; color: #0e7490;
-    text-align: center; font-weight: 500;
-  }
+/* ── solver box ── */
+.solver {
+  border: 2px dashed #3b82f6; border-radius: 14px;
+  background: #f8faff; padding: 12px 14px 14px;
+  width: 100%; position: relative;
+}
+.solver-lbl {
+  position: absolute; top: -10px; left: 16px;
+  background: #f8faff; padding: 0 7px;
+  font-size: 10.5px; font-weight: 700; color: #3b82f6;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
 
-  /* ── Data anchors sidebar ── */
-  .anchors-col {
-    display: flex; flex-direction: column; gap: 6px;
-    min-width: 130px;
-  }
-  .anchor-badge {
-    background: #fff1f2;
-    border: 1px solid #fecdd3;
-    border-radius: 8px;
-    padding: 5px 10px;
-    font-size: 10px; color: #be123c; font-weight: 500;
-    text-align: center;
-  }
-  .anchor-label {
-    font-size: 10px; font-weight: 700; color: #9f1239;
-    text-align: center; letter-spacing: 0.04em;
-    text-transform: uppercase; margin-bottom: 2px;
-  }
-  .anchor-note {
-    font-size: 9.5px; color: #fb7185; text-align: center;
-    font-style: italic;
-  }
+/* ── solver top row ── */
+.s-top { display: flex; align-items: center; gap: 0; justify-content: center; }
 
-  /* ── Output card full-width ── */
-  .output-card {
-    flex: 1;
-    background: white;
-    border-radius: 14px;
-    padding: 14px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06);
-    border-top: 3px solid #16a34a;
-    display: flex; align-items: center; gap: 16px;
-  }
-  .output-title {
-    font-size: 13px; font-weight: 700; color: #1d1d1f;
-  }
-  .output-chips {
-    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
-  }
-  .chip {
-    background: #f0fdf4; border: 1px solid #bbf7d0;
-    border-radius: 20px; padding: 2px 10px;
-    font-size: 10px; color: #15803d; font-weight: 600;
-  }
-  .chip.price { background: #f0fdf4; border-color: #4ade80; color: #166534; }
-  .chip.greek { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+/* ── upward connector ── */
+.up-wrap { display: flex; justify-content: flex-end; padding-right: 80px; }
+.up {
+  width: 2px; height: 12px; background: #94a3b8; position: relative;
+}
+.up::before {
+  content: ""; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 7px solid #94a3b8;
+}
 
-  /* ── Timing badge ── */
-  .timing {
-    margin-left: auto; flex-shrink: 0;
-    background: #f5f5f7; border-radius: 20px;
-    padding: 4px 12px; font-size: 10.5px;
-    color: #6e6e73; font-weight: 500;
-  }
+/* ── data anchors ── */
+.anchors {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; margin-top: 8px;
+}
+.anchor-box {
+  border: 1.5px dashed #ef4444; border-radius: 9px;
+  background: #fff5f5; padding: 8px 14px; text-align: center;
+}
+.a-title { font-size: 10.5px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.05em; }
+.a-chips { display: flex; gap: 4px; justify-content: center; margin-top: 4px; }
+.chip {
+  background: #fee2e2; border: 1px solid #fca5a5; border-radius: 20px;
+  padding: 1px 7px; font-size: 9.5px; color: #7f1d1d; font-weight: 500;
+}
+.a-note { font-size: 9px; color: #b91c1c; margin-top: 3px; font-style: italic; }
+
+.dash-arr {
+  display: flex; flex-direction: column; align-items: center; margin-right: 6px;
+}
+.dash-lbl { font-size: 9px; color: #ef4444; font-weight: 600; margin-bottom: 2px; }
+.dash-line {
+  width: 32px; height: 2px; position: relative;
+  border-top: 2px dashed #ef4444;
+}
+.dash-line::after {
+  content: ""; position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-left: 7px solid #ef4444;
+}
+
+/* ── output ── */
+.out-row { display: flex; align-items: center; gap: 10px; }
+.badge {
+  background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 20px;
+  padding: 3px 11px; font-size: 10px; color: #475569; font-weight: 500; white-space: nowrap;
+}
+
+/* ── layer labels ── */
+.with-label { display: flex; align-items: center; width: 100%; gap: 8px; }
+.lbl {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 5px 3px; border-radius: 5px; flex-shrink: 0; text-align: center;
+}
+.lbl-p { color: #7c3aed; background: #f3e8ff; }
+.lbl-b { color: #1d4ed8; background: #eff6ff; }
+.lbl-g { color: #15803d; background: #f0fdf4; }
+.lbl-content { flex: 1; display: flex; justify-content: center; }
 </style>
 </head>
 <body>
-<div class="diagram">
+<div class="flow">
 
-  <!-- ── Layer 1: Interaction ── -->
-  <div class="layer layer-interaction">
-    <div class="layer-label" style="color:#7c3aed">Interaction</div>
-    <div class="layer-body">
-      <div class="card card-purple">
-        <div class="card-title">User Input</div>
-        <div class="card-sub">Natural language (CN / EN)</div>
-      </div>
-      <div class="inline-arrow">→</div>
-      <div class="card card-orange" style="flex:2">
-        <div class="card-title">LLM Router</div>
-        <div class="card-sub">Parameter extraction &amp; model selection</div>
-      </div>
-      <div class="inline-arrow">→</div>
-      <div class="card card-green" style="flex:1.5">
-        <div class="card-title">Structured JSON</div>
-        <div class="card-sub formula">{model, S, K, T, r, λ}</div>
+  <!-- Layer 1: Interaction -->
+  <div class="with-label">
+    <div class="lbl lbl-p">Interaction</div>
+    <div class="lbl-content">
+      <div class="l1-row">
+        <div class="node n-purple" style="min-width:150px">
+          <div class="nt">用户输入</div>
+          <div class="ns">自然语言（中 / EN）</div>
+        </div>
+        <div class="right"></div>
+        <div class="node n-amber" style="min-width:200px">
+          <div class="nt">LLM 路由层</div>
+          <div class="ns">参数提取 &amp; 模型选择</div>
+        </div>
+        <div class="right"></div>
+        <div class="node n-teal" style="min-width:180px">
+          <div class="nt">结构化 JSON</div>
+          <div class="ns">{model, S, K, T, r, λ}</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Connector ── -->
-  <div class="connector"><div class="connector-arrow"></div></div>
+  <!-- ↓ -->
+  <div class="with-label">
+    <div style="width:21px;flex-shrink:0"></div>
+    <div class="lbl-content"><div class="down"></div></div>
+  </div>
 
-  <!-- ── Layer 2: Solver ── -->
-  <div class="layer layer-solver">
-    <div class="layer-label" style="color:#2563eb">Solver</div>
-    <div class="layer-body" style="align-items:flex-start">
-      <div class="solver-inner">
-        <div class="solver-row">
-          <div class="card card-indigo">
-            <div class="card-title">Soft Mask</div>
-            <div class="card-sub formula">mask = tanh²(ξ / 0.05)</div>
-            <div class="card-sub" style="margin-top:3px">BSM/CEV ↔ Heston</div>
+  <!-- Layer 2: Solver -->
+  <div class="with-label" style="align-items:flex-start">
+    <div class="lbl lbl-b" style="align-self:center">Solver</div>
+    <div class="lbl-content">
+      <div class="solver">
+        <div class="solver-lbl">统一 PINN 求解器</div>
+
+        <!-- top row: Soft Mask → Additive Output -->
+        <div class="s-top">
+          <div class="node n-indigo" style="min-width:185px">
+            <div class="nt">软掩码</div>
+            <div class="ns">mask = tanh²(ξ / 0.05)</div>
+            <div class="ni">ξ=0 → BSM/CEV &nbsp;|&nbsp; ξ&gt;0 → Heston</div>
           </div>
-          <div class="inline-arrow" style="align-self:center">→</div>
-          <div class="card card-blue" style="flex:1.6">
-            <div class="card-title">Additive Output</div>
-            <div class="card-sub formula">V̂ = V_BS(σ_eff) + K · Net(x)</div>
-            <div class="card-sub" style="margin-top:3px">6 × 128 tanh network</div>
+          <div class="right"></div>
+          <div class="node n-blue" style="min-width:220px">
+            <div class="nt">加法参数化输出</div>
+            <div class="ns">V̂ = V<sub>BS</sub>(σ<sub>eff</sub>) + K · Net(<b>x</b>)</div>
+            <div class="ni">6 × 128 tanh 网络</div>
           </div>
         </div>
-        <div class="solver-pde">
-          Unified PDE &nbsp;·&nbsp; ξ = 0 → BSM / CEV &nbsp;&nbsp;|&nbsp;&nbsp; ξ &gt; 0 → Heston
+
+        <!-- upward arrow from PDE to Additive Output -->
+        <div class="up-wrap"><div class="up"></div></div>
+
+        <!-- Unified PDE -->
+        <div class="node n-cyan" style="width:100%;margin-top:0">
+          <div class="nt">统一 PDE 算子</div>
+          <div class="ns">ξ = 0 : BSM / CEV（一维）&nbsp;&nbsp;|&nbsp;&nbsp; ξ &gt; 0 : Heston（二维随机波动率）</div>
         </div>
-      </div>
-      <!-- Data anchors -->
-      <div class="anchors-col" style="margin-left:10px; align-self:stretch; justify-content:center">
-        <div class="anchor-label">Data Anchors</div>
-        <div class="anchor-note">training only</div>
-        <div class="anchor-badge">BSM: analytic</div>
-        <div class="anchor-badge">CEV: Schroder</div>
-        <div class="anchor-badge">Heston: GL</div>
+
+        <!-- Data Anchors -->
+        <div class="anchors">
+          <div class="dash-arr">
+            <div class="dash-lbl">监督（训练期）</div>
+            <div class="dash-line"></div>
+          </div>
+          <div class="anchor-box">
+            <div class="a-title">数据锚点</div>
+            <div class="a-chips">
+              <span class="chip">BSM 解析解</span>
+              <span class="chip">CEV Schroder</span>
+              <span class="chip">Heston GL</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 
-  <!-- ── Connector ── -->
-  <div class="connector"><div class="connector-arrow"></div></div>
+  <!-- ↓ -->
+  <div class="with-label">
+    <div style="width:21px;flex-shrink:0"></div>
+    <div class="lbl-content"><div class="down"></div></div>
+  </div>
 
-  <!-- ── Layer 3: Output ── -->
-  <div class="layer layer-output">
-    <div class="layer-label" style="color:#16a34a">Output</div>
-    <div class="layer-body">
-      <div class="output-card">
-        <div>
-          <div class="output-title">Option Pricing Result</div>
-          <div class="output-chips">
-            <span class="chip price">Price</span>
-            <span class="chip greek">Delta</span>
-            <span class="chip greek">Gamma</span>
-            <span class="chip greek">Vega</span>
-            <span class="chip greek">Theta</span>
+  <!-- Layer 3: Output -->
+  <div class="with-label">
+    <div class="lbl lbl-g">Output</div>
+    <div class="lbl-content">
+      <div class="node n-green">
+        <div class="out-row">
+          <div>
+            <div class="nt">期权价格 + Greeks</div>
+            <div class="ns">Price · Delta · Gamma · Vega · Theta</div>
           </div>
+          <div class="badge">~2 ms / query</div>
         </div>
-        <div class="timing">~2 ms / query</div>
       </div>
     </div>
   </div>
