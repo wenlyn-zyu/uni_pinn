@@ -80,13 +80,15 @@ def _format_occ_for_llm(occ: str) -> str:
     d = decode_occ_symbol(occ)
     return (
         f"OCC option code: {occ}\n"
-        f"Decoded: ticker={d['ticker']}, option_type={d['option_type']}, "
+        f"FIXED (from OCC code, do NOT change): "
+        f"ticker={d['ticker']}, option_type={d['option_type']}, "
         f"strike K={d['strike']}, expiry={d['expiry']}, "
-        f"T≈{d['T_approx']} years from today ({date.today().isoformat()}).\n"
-        f"Please determine the underlying spot price S for {d['ticker']} "
-        f"(use a reasonable estimate if unknown) and any other missing "
-        f"parameters. Use BSM model with sigma=0.2 unless the user "
-        f"specifies otherwise."
+        f"T={d['T_approx']} years (today is {date.today().isoformat()}).\n"
+        f"YOU MUST use the K, T, and option_type values above exactly as given. "
+        f"Determine the spot price S for {d['ticker']} "
+        f"(use a reasonable recent price you know, otherwise default to 100), "
+        f"and fill any missing parameters. "
+        f"Use BSM model with sigma=0.2 unless the user specifies otherwise."
     )
 
 SYSTEM_PROMPT = """You are an option pricing parameter extractor. Given a user's natural language description of an option, extract the pricing parameters and select the appropriate pricing model.
@@ -159,12 +161,17 @@ def validate_params(params: dict) -> dict:
         ("xi",    0.0,   5.0),
         ("rho",   -0.999, 0.999),
     ]
+    # parameters only relevant for Heston (their defaults of 0 are fine for BSM/CEV)
+    _heston_keys = {"kappa", "theta", "xi", "rho", "v0"}
+
     for key, lo, hi in checks:
         if key not in params:
             continue
         orig = params[key]
         params[key] = float(max(lo, min(hi, orig)))
-        if params[key] != orig:
+        if params[key] != orig and key not in _heston_keys:
+            print(f"[WARN] {key}={orig:.4f} out of range [{lo},{hi}], clamped to {params[key]:.4f}")
+        elif params[key] != orig and params.get("model") == "heston":
             print(f"[WARN] {key}={orig:.4f} out of range [{lo},{hi}], clamped to {params[key]:.4f}")
 
     if params["model"] not in ("bsm", "cev", "heston"):
