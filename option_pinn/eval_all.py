@@ -40,13 +40,27 @@ HESTON_UNIFIED = dict(kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04)
 def _mse_relmse(pred, ref):
     pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
     mse    = float(np.mean((pred - ref) ** 2))
-    # 只在参考解足够大时计算相对误差（避免深度虚值时分母趋零）
     mask   = np.abs(ref) > 0.01
     if mask.sum() == 0:
         relmse = float("nan")
     else:
         relmse = float(np.mean(((pred[mask] - ref[mask]) / np.abs(ref[mask])) ** 2))
     return mse, relmse
+
+
+def _atm_mask(S_arr, K, lo=0.8, hi=1.2):
+    """ATM region mask: S/K ∈ [lo, hi] (consistent with thesis S∈[80,120] for K=100)."""
+    s_arr = np.array(S_arr, dtype=float)
+    return (s_arr / K >= lo) & (s_arr / K <= hi)
+
+
+def _relmse_atm(pred, ref, S_arr, K=100.0):
+    """RelMSE restricted to ATM region (S/K ∈ [0.8, 1.2]) — robust for inter-model comparison."""
+    pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
+    mask = _atm_mask(S_arr, K) & (np.abs(ref) > 0.01)
+    if mask.sum() == 0:
+        return float("nan")
+    return float(np.mean(((pred[mask] - ref[mask]) / np.abs(ref[mask])) ** 2))
 
 
 def _mae(pred, ref):
@@ -153,10 +167,14 @@ def load_parametric():
     return pinn
 
 
-# ── Greeks via autograd（unified PINN）────────────────────────────────────────
+# ── Greeks（unified PINN）───────────────────────────────────────────────────────
 
 def unified_greeks_autograd(pinn, p, S_arr):
-    """计算 unified PINN 的 Delta、Gamma、Vega（autograd）。"""
+    """计算 unified PINN 的 Delta、Gamma（autograd）+ Vega（autograd dV/dv）。
+
+    Vega 说明：对于 Heston 模型，dV/dv 是有意义的敏感度（Vega in variance）。
+    对于 BSM 模型，应使用 unified_bsm_vega_fd() 代替。
+    """
     from unified_pinn_v2 import ModelParams
     results = []
     lam = p.to_lambda_tensor(DEVICE)
@@ -179,6 +197,52 @@ def unified_greeks_autograd(pinn, p, S_arr):
     return results
 
 
+def unified_bsm_greeks(pinn, p_bsm, S_arr, h_sigma=0.001):
+    """BSM Greeks: Delta/Gamma via autograd, Vega via FD on σ (d V / d σ).
+
+    dV/dv (autograd on variance input) is meaningless for BSM because the
+    network ignores v when xi=0 (mask=0).  The standard BSM Vega is dV/dσ,
+    computed here via central finite difference on the sigma parameter.
+    """
+    from unified_pinn_v2 import ModelParams
+    results = []
+    lam = p_bsm.to_lambda_tensor(DEVICE)
+    for S_val in S_arr:
+        S_t = torch.tensor([[float(S_val)]], dtype=torch.float32,
+                            device=DEVICE, requires_grad=True)
+        v_t = torch.tensor([[float(p_bsm.v0)]], dtype=torch.float32,
+                            device=DEVICE)
+        t_t = torch.tensor([[0.0]], dtype=torch.float32, device=DEVICE)
+
+        V = pinn.net(S_t/p_bsm.S_max, v_t/p_bsm.v_max, t_t/p_bsm.T,
+                     lam, S_t, t_t, p_bsm.K, p_bsm.T, p_bsm.r)
+
+        # Delta, Gamma via autograd
+        dV_dS = torch.autograd.grad(V, S_t, create_graph=True, retain_graph=True)[0]
+        d2V_dS2 = torch.autograd.grad(dV_dS, S_t, retain_graph=True)[0]
+
+        # Vega = dV/dσ via central FD on sigma parameter
+        p_up = ModelParams.from_bsm(K=p_bsm.K, T=p_bsm.T, r=p_bsm.r,
+                                    sigma=p_bsm.sigma + h_sigma)
+        p_dn = ModelParams.from_bsm(K=p_bsm.K, T=p_bsm.T, r=p_bsm.r,
+                                    sigma=p_bsm.sigma - h_sigma)
+        with torch.no_grad():
+            V_up = pinn.net(S_t/p_bsm.S_max, v_t/p_bsm.v_max, t_t/p_bsm.T,
+                           p_up.to_lambda_tensor(DEVICE), S_t, t_t,
+                           p_bsm.K, p_bsm.T, p_bsm.r)
+            V_dn = pinn.net(S_t/p_bsm.S_max, v_t/p_bsm.v_max, t_t/p_bsm.T,
+                           p_dn.to_lambda_tensor(DEVICE), S_t, t_t,
+                           p_bsm.K, p_bsm.T, p_bsm.r)
+        vega = (V_up.item() - V_dn.item()) / (2 * h_sigma)
+
+        results.append({
+            "delta": float(dV_dS.item()),
+            "gamma": float(d2V_dS2.item()),
+            "vega":  vega,
+        })
+    return results
+
+
 # ── 合成数据评估 ──────────────────────────────────────────────────────────────
 
 def eval_synthetic():
@@ -194,18 +258,35 @@ def eval_synthetic():
     ref_bsm_g    = [bsm_greeks(S, K_SYN, T_SYN, r_SYN, **BSM_PARAMS)      for S in S_GRID]
     ref_heston_g = [heston_greeks_fd(S, K_SYN, T_SYN, r_SYN, **HESTON_UNIFIED) for S in S_GRID]
 
-    def add_price(name, pred_bsm, pred_cev, pred_heston, ref_heston):
-        bm, br = _mse_relmse(pred_bsm,    ref_bsm)
-        cm, cr = _mse_relmse(pred_cev,    ref_cev)
-        hm, hr = _mse_relmse_otm(pred_heston, ref_heston, S_GRID)
+    def add_price(name, pred_bsm, pred_cev, pred_heston, ref_heston,
+                  is_hainaut=False):
+        """Add one row to the price table.
+
+        MSE: full S range.
+        RelMSE: ATM only (S/K ∈ [0.8, 1.2]) for all models — robust against
+                deep-OTM denominator blow-up.  Consistent with thesis RelMAE_ATM.
+        Heston RelMSE: for Hainaut (put-call parity), uses S/K >= 0.85 filter
+                to exclude deep-OTM CALL (deep-ITM PUT) where parity amplifies
+                conversion errors.
+        """
+        bm = float(np.mean((np.array(pred_bsm) - np.array(ref_bsm)) ** 2))
+        cm = float(np.mean((np.array(pred_cev) - np.array(ref_cev)) ** 2))
+        hm = float(np.mean((np.array(pred_heston) - np.array(ref_heston)) ** 2))
+        br = _relmse_atm(pred_bsm, ref_bsm, S_GRID, K_SYN)
+        cr = _relmse_atm(pred_cev, ref_cev, S_GRID, K_SYN)
+        if is_hainaut:
+            _, hr = _mse_relmse_otm(pred_heston, ref_heston, S_GRID)
+        else:
+            hr = _relmse_atm(pred_heston, ref_heston, S_GRID, K_SYN)
         rows_price.append({
             "model": name,
-            "bsm_mse": bm, "bsm_relmse": br,
-            "cev_mse": cm, "cev_relmse": cr,
-            "heston_mse": hm, "heston_relmse": hr,
+            "bsm_mse": bm, "bsm_relmse_atm": br,
+            "cev_mse": cm, "cev_relmse_atm": cr,
+            "heston_mse": hm, "heston_relmse_atm": hr,
         })
-        print(f"  {name:20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
-              f"Heston RelMSE={hr:.4f}  [Heston: S/K>=0.85 only]")
+        tag = " [Heston S/K>=0.85, Hainaut]" if is_hainaut else ""
+        print(f"  {name:20s}  BSM RelMSE_ATM={br:.6f}  "
+              f"CEV RelMSE_ATM={cr:.6f}  Heston RelMSE_ATM={hr:.6f}{tag}")
 
     def add_greeks(name, model_type, pred_g, ref_g):
         dm = _mae([g["delta"] for g in pred_g], [g["delta"] for g in ref_g])
@@ -241,17 +322,8 @@ def eval_synthetic():
 
     pred_hainaut_u = np.array([_hainaut_call(S, HESTON_UNIFIED, r_SYN) for S in S_GRID])
 
-    bm, br = _mse_relmse(pred_bsm_i, ref_bsm)
-    cm, cr = _mse_relmse(pred_cev_i, ref_cev_i)
-    hm, hr = _mse_relmse_otm(pred_hainaut_u, ref_heston_u, S_GRID)
-    rows_price.append({
-        "model": "indep",
-        "bsm_mse": bm, "bsm_relmse": br,
-        "cev_mse": cm, "cev_relmse": cr,
-        "heston_mse": hm, "heston_relmse": hr,
-    })
-    print(f"  {'indep (hainaut)':20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
-          f"Heston RelMSE={hr:.4f}  [Heston: S/K>=0.85 only, Hainaut & Casas 2024]")
+    add_price("indep", pred_bsm_i, pred_cev_i, pred_hainaut_u, ref_heston_u,
+              is_hainaut=True)
 
     # ── Unified v2 ──
     print("加载 Unified v2...")
@@ -266,7 +338,7 @@ def eval_synthetic():
     pred_heston_u = [unified.price(p_heston, S) for S in S_GRID]
     add_price("unified_v2", pred_bsm_u, pred_cev_u, pred_heston_u, ref_heston_u)
 
-    greeks_bsm_u    = unified_greeks_autograd(unified, p_bsm,    S_GRID)
+    greeks_bsm_u    = unified_bsm_greeks(unified, p_bsm,    S_GRID)
     greeks_heston_u = unified_greeks_autograd(unified, p_heston, S_GRID)
     add_greeks("unified_v2", "BSM",    greeks_bsm_u,    ref_bsm_g)
     add_greeks("unified_v2", "Heston", greeks_heston_u, ref_heston_g)
@@ -280,7 +352,7 @@ def eval_synthetic():
         pred_cev_ft    = [unified_ft.price(p_cev,    S) for S in S_GRID]
         pred_heston_ft = [unified_ft.price(p_heston, S) for S in S_GRID]
         add_price("unified_v2_ft", pred_bsm_ft, pred_cev_ft, pred_heston_ft, ref_heston_u)
-        greeks_bsm_ft    = unified_greeks_autograd(unified_ft, p_bsm,    S_GRID)
+        greeks_bsm_ft    = unified_bsm_greeks(unified_ft, p_bsm,    S_GRID)
         greeks_heston_ft = unified_greeks_autograd(unified_ft, p_heston, S_GRID)
         add_greeks("unified_v2_ft", "BSM",    greeks_bsm_ft,    ref_bsm_g)
         add_greeks("unified_v2_ft", "Heston", greeks_heston_ft, ref_heston_g)
