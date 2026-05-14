@@ -4,14 +4,17 @@
 用法:
   python llm_router.py "定价一份欧式看涨期权，特斯拉现价250，行权价260，半年到期"
   python llm_router.py "price a European put on AAPL, S=220, K=210, T=0.5yr, sigma=0.25"
+  python llm_router.py "AAPL230616C00150000"                                      # OCC代码
 
 依赖: openai (联网), torch + unified_pinn_v2 (定价时需要)
 """
 
 import os
+import re
 import sys
 import json
 import argparse
+from datetime import date
 
 from openai import OpenAI
 
@@ -23,6 +26,68 @@ DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+
+# ---------------------------------------------------------------------------
+# OCC option symbol decoding
+# ---------------------------------------------------------------------------
+# OCC format: {SYMBOL:≤6}{YY}{MM}{DD}{C/P}{STRIKE×1000:8digits}
+# Example: AAPL230616C00150000 → AAPL call expiring 2023-06-16 strike $150.000
+
+_OCC_RE = re.compile(
+    r"^([A-Za-z]{1,6})"          # ticker (1-6 letters)
+    r"(\d{2})(\d{2})(\d{2})"     # YY MM DD
+    r"([CP])"                     # Call / Put
+    r"(\d{8})$"                   # strike × 1000, zero-padded
+)
+
+def is_occ_symbol(text: str) -> bool:
+    """Check whether *text* looks like a standalone OCC option symbol."""
+    return bool(_OCC_RE.match(text.strip()))
+
+
+def decode_occ_symbol(occ: str) -> dict:
+    """Decode an OCC option symbol into its components.
+
+    Returns dict with keys: ticker, expiry (YYYY-MM-DD), option_type (call/put),
+    strike, T (years from today).  T is approximate and should be verified.
+    """
+    m = _OCC_RE.match(occ.strip().upper())
+    if not m:
+        raise ValueError(f"Invalid OCC option symbol: {occ}")
+
+    ticker, yy, mm, dd, cp, strike_raw = m.groups()
+    year  = 2000 + int(yy)
+    month = int(mm)
+    day   = int(dd)
+    strike = int(strike_raw) / 1000.0
+    option_type = "call" if cp == "C" else "put"
+
+    expiry_date = date(year, month, day)
+    today = date.today()
+    T = max((expiry_date - today).days / 365.0, 0.001)
+
+    return {
+        "ticker":      ticker,
+        "expiry":      expiry_date.isoformat(),
+        "option_type": option_type,
+        "strike":      strike,
+        "T_approx":    round(T, 4),
+    }
+
+
+def _format_occ_for_llm(occ: str) -> str:
+    """Decode OCC symbol and return a prompt fragment for the LLM."""
+    d = decode_occ_symbol(occ)
+    return (
+        f"OCC option code: {occ}\n"
+        f"Decoded: ticker={d['ticker']}, option_type={d['option_type']}, "
+        f"strike K={d['strike']}, expiry={d['expiry']}, "
+        f"T≈{d['T_approx']} years from today ({date.today().isoformat()}).\n"
+        f"Please determine the underlying spot price S for {d['ticker']} "
+        f"(use a reasonable estimate if unknown) and any other missing "
+        f"parameters. Use BSM model with sigma=0.2 unless the user "
+        f"specifies otherwise."
+    )
 
 SYSTEM_PROMPT = """You are an option pricing parameter extractor. Given a user's natural language description of an option, extract the pricing parameters and select the appropriate pricing model.
 
@@ -183,11 +248,17 @@ class LLMRouter:
     def extract_params(self, user_input: str, retry: bool = True) -> dict:
         """Send user input to DeepSeek and return parsed parameter dict.
 
+        Automatically detects and decodes OCC option symbols before LLM call.
         Raises ValueError on JSON parse failure after retry.
         """
+        # Preprocess: detect OCC symbol
+        user_text = user_input.strip()
+        if is_occ_symbol(user_text):
+            user_text = _format_occ_for_llm(user_text)
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_input},
+            {"role": "user",   "content": user_text},
         ]
         raw = ""
         for attempt in range(2):
@@ -276,8 +347,9 @@ def main():
     )
     parser.add_argument(
         "query", type=str,
-        help="Natural language option description, e.g. "
-             "'定价一份欧式看涨期权 TSLA S=250 K=260 T=0.5 sigma=0.3'"
+        help="Natural language option description or OCC symbol, e.g. "
+             "'定价一份欧式看涨期权 TSLA S=250 K=260 T=0.5 sigma=0.3' or "
+             "'AAPL230616C00150000'"
     )
     parser.add_argument(
         "--json", action="store_true",
