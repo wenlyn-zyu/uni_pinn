@@ -1,53 +1,49 @@
 \chapter{相关工作}\label{chap:related}
 
-本章从三个方向梳理与本文直接相关的已有工作。在第~\ref{sec:option_models}节中，介绍经典期权定价模型及其PDE形式；在第~\ref{sec:pinn}节中，回顾PINN的基本原理及其在期权定价中的应用；在第~\ref{sec:llm_sci}节中，介绍LLM辅助科学计算的最新进展。
-
 \section{期权定价模型}\label{sec:option_models}
-
-期权定价的核心问题是在给定标的资产动态假设下，求解期权价值所满足的偏微分方程（PDE）。期权定价理论的发展历程体现了从简单到复杂、从单因子到多因子的演进路径。
 
 \subsection{Black-Scholes-Merton模型}
 
-Black、Scholes与Merton于1973年提出了期权定价的奠基性框架\cite{black1973pricing,merton1973theory}。该模型假设标的资产价格$S$服从几何布朗运动：
+Black、Scholes与Merton于1973年提出了期权定价的奠基性框架\cite{black1973pricing,merton1973theory}。假设标的资产价格$S$服从几何布朗运动：
 \begin{equation}
   dS = \mu S\,dt + \sigma S\,dW_t,
 \end{equation}
-其中$\mu$为漂移率，$\sigma$为常数波动率，$W_t$为标准布朗运动。通过无套利原理和Itô引理，欧式期权价值$V(S,t)$满足Black-Scholes-Merton（BSM）方程：
+其中$\sigma$为常数波动率，$W_t$为标准布朗运动。通过无套利原理，欧式期权价值$V(S,t)$满足BSM方程：
 \begin{equation}\label{eq:bsm}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2}
   + rS\frac{\partial V}{\partial S}
   - rV = 0,
 \end{equation}
-其中$r$为无风险利率。该方程在终值条件$V(S,T)=\max(S-K,0)$（欧式看涨期权）和边界条件$V(0,t)=0$、$V(S,t)\to S$（$S\to\infty$）下具有封闭解析解（Black-Scholes公式）：
+其中$r$为无风险利率。欧式看涨期权具有封闭解析解（Black-Scholes公式）：
 \begin{equation}\label{eq:bs_formula}
   V_\text{BS}(S,t) = S\Phi(d_1) - Ke^{-r(T-t)}\Phi(d_2),
 \end{equation}
-其中$d_1 = \frac{\ln(S/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$，$d_2=d_1-\sigma\sqrt{T-t}$，$\Phi(\cdot)$为标准正态累积分布函数。BSM模型的主要局限在于假设波动率为常数，与市场中观测到的波动率微笑现象不符。实证研究表明，不同执行价的隐含波动率并非常数，而是呈现出"微笑"或"偏斜"形状，说明市场对极端事件的定价高于BSM模型的预测。
+其中$d_1 = \frac{\ln(S/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$，$d_2=d_1-\sigma\sqrt{T-t}$，$\Phi(\cdot)$为标准正态累积分布函数。BSM模型的主要局限在于假设波动率为常数，无法解释市场中普遍存在的波动率微笑现象。
 
 \subsection{常弹性方差模型}
 
-Cox和Ross\cite{cox1976valuation}提出了常弹性方差（Constant Elasticity of Variance，CEV）模型，将BSM中的常数波动率推广为依赖于标的价格的局部波动率：
+Cox和Ross\cite{cox1976valuation}提出了常弹性方差（CEV）模型，将扩散系数推广为依赖于标的价格的局部波动率：
 \begin{equation}
   dS = \mu S\,dt + \sigma S^{\beta}\,dW_t,
 \end{equation}
-其中$\beta$为弹性参数，$\sigma$为尺度参数。当$\beta=1$时退化为BSM模型；当$\beta<1$时，波动率随股价上涨而下降，能够捕捉股票市场中的杠杆效应（leverage effect）——即股价下跌时波动率上升的现象。对应的期权定价PDE为：
+其中$\beta$为弹性参数。当$\beta=1$时退化为BSM；当$\beta<1$时，波动率随股价上涨而下降，能够捕捉股票市场的杠杆效应。对应的期权定价PDE为：
 \begin{equation}\label{eq:cev}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}\sigma^2 S^{2\beta} \frac{\partial^2 V}{\partial S^2}
   + rS\frac{\partial V}{\partial S}
   - rV = 0.
 \end{equation}
-CEV模型一般情况下无闭合解析解，通常采用有限差分法或级数展开法求解。本文取$\beta=0.5$（平方根过程），此时扩散系数$\sigma^2 S$随股价线性增长，能够捕捉股票市场中的典型杠杆效应。CEV模型的优势在于仅引入一个额外参数$\beta$，模型复杂度低，同时能够产生波动率偏斜，更好地拟合股票期权市场；当$\beta<1$时，股价过程在$S=0$处有吸收边界，能够模拟公司破产的可能性。
+本文取$\beta=0.5$（平方根过程）。Schroder\cite{schroder1989computing}指出，$\beta=0.5$时CEV欧式看涨期权存在精确解析解（非中心卡方分布），本文以此作为CEV的参考基准。
 
 \subsection{Heston随机波动率模型}
 
-Heston\cite{heston1993closed}提出了随机波动率模型，将波动率本身建模为一个均值回归过程（CIR过程）：
+Heston\cite{heston1993closed}将波动率建模为均值回归过程（CIR过程）：
 \begin{align}
   dS &= \mu S\,dt + \sqrt{v}\,S\,dW_t^S, \\
   dv &= \kappa(\theta - v)\,dt + \xi\sqrt{v}\,dW_t^v,
 \end{align}
-其中$v$为瞬时方差，$\kappa$为均值回归速度，$\theta$为长期均值，$\xi$为波动率的波动率（vol-of-vol），$dW_t^S$与$dW_t^v$的相关系数为$\rho$。期权价值$V(S,v,t)$满足二维PDE：
+其中$v$为瞬时方差，$\kappa$为均值回归速度，$\theta$为长期均值，$\xi$为vol-of-vol，$dW_t^S$与$dW_t^v$的相关系数为$\rho$。期权价值$V(S,v,t)$满足二维PDE：
 \begin{equation}\label{eq:heston}
   \frac{\partial V}{\partial t}
   + \frac{1}{2}vS^2\frac{\partial^2 V}{\partial S^2}
@@ -57,101 +53,74 @@ Heston\cite{heston1993closed}提出了随机波动率模型，将波动率本身
   + \kappa(\theta-v)\frac{\partial V}{\partial v}
   - rV = 0.
 \end{equation}
-Heston模型具有半解析解（通过特征函数方法和Gil-Pelaez反演），但数值求解二维PDE的计算代价显著高于一维情形。模型中，$\kappa$控制方差过程回归到长期均值的速度，$\theta$决定了长期隐含波动率水平，$\xi$控制波动率微笑的曲率，而负相关系数$\rho<0$产生波动率偏斜，符合股票市场的实证特征。Feller条件$2\kappa\theta>\xi^2$保证方差过程$v$始终为正，在实际应用中通常需要满足此条件。Heston模型能够产生厚尾收益率分布，对长期期权和波动率衍生品的定价更为准确。
-
-\subsection{三大模型的比较}
-
-表~\ref{tab:model_comparison}从多个维度比较了三大期权定价模型的特性。
-
-\begin{table}[htbp]
-  \centering
-  \caption{BSM、CEV、Heston三大期权定价模型比较}
-  \label{tab:model_comparison}
-  \begin{tabular}{lccc}
-    \hline
-    特性 & BSM & CEV & Heston \\
-    \hline
-    波动率假设 & 常数 & 局部（依赖$S$） & 随机（CIR过程） \\
-    PDE维度 & 1维 & 1维 & 2维 \\
-    解析解 & 有（封闭） & 无（级数展开） & 半解析（特征函数） \\
-    参数数量 & 2（$\sigma,r$） & 3（$\sigma,\beta,r$） & 6（$\kappa,\theta,\xi,\rho,v_0,r$） \\
-    波动率微笑 & 不能捕捉 & 部分捕捉（偏斜） & 完整捕捉（微笑+偏斜） \\
-    计算复杂度 & 低 & 中 & 高 \\
-    适用场景 & 短期、平稳市场 & 股票期权 & 指数、外汇期权 \\
-    \hline
-  \end{tabular}
-\end{table}
+Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能够产生波动率微笑和厚尾收益率分布，在指数期权和外汇期权中被广泛使用。Feller条件$2\kappa\theta>\xi^2$保证方差过程$v$始终为正。
 
 \section{物理信息神经网络}\label{sec:pinn}
 
 \subsection{基本原理}
 
-物理信息神经网络（Physics-Informed Neural Networks，PINN）由Raissi等人\cite{raissi2019physics}于2019年提出，其核心思想是将PDE的残差直接嵌入神经网络的损失函数，使网络在拟合边界条件的同时自动满足物理方程约束。对于一般形式的PDE $\mathcal{F}[u]=0$，PINN的总损失为：
+物理信息神经网络（PINN）由Raissi等人\cite{raissi2019physics}于2019年提出，其核心思想是将PDE残差直接嵌入神经网络的损失函数。对于PDE $\mathcal{F}[u]=0$，PINN的总损失为：
 \begin{equation}\label{eq:pinn_loss}
   \mathcal{L} = w_{\text{pde}}\mathcal{L}_{\text{pde}}
               + w_{\text{ic}}\mathcal{L}_{\text{ic}}
               + w_{\text{bc}}\mathcal{L}_{\text{bc}},
 \end{equation}
-其中$\mathcal{L}_{\text{pde}}$为配点处的PDE残差均方误差，$\mathcal{L}_{\text{ic}}$和$\mathcal{L}_{\text{bc}}$分别为初值条件和边界条件的拟合误差。PDE残差通过自动微分（automatic differentiation）\cite{baydin2018automatic}精确计算，无需有限差分近似。
-
-PINN的训练过程本质上是一个约束优化问题：在满足PDE约束的前提下，最小化边界条件和初值条件的拟合误差。与传统数值方法相比，PINN无需对求解域进行网格剖分，天然避免了维数灾难；通过将模型参数作为网络输入，单个网络可以覆盖整个参数空间，无需针对不同参数重新求解；训练完成后，对任意输入的推断时间约为毫秒级，远低于传统数值方法。另一方面，PINN的主要挑战在于损失函数中多个约束项之间的权重平衡、高维问题中配点的有效采样，以及复杂PDE（如含交叉偏导项的Heston方程）的收敛困难。
+其中各项分别为配点处的PDE残差、初值条件和边界条件的均方误差，$w_{\text{pde}},w_{\text{ic}},w_{\text{bc}}$为权重超参数。PDE残差通过自动微分精确计算，无需有限差分近似。PINN无需网格剖分，训练完成后对任意输入的推断时间约为毫秒级。
 
 \subsection{PINN在期权定价中的应用}
 
-将PINN应用于期权定价是近年来的研究热点。Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征，并与真实市场价格进行了对比验证。该工作验证了PINN在期权定价中的可行性，但仅针对BSM模型，且网络结构较为复杂。Zamxaka\cite{zamxaka2023cev}在其学位论文中系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格，无需重新训练。该工作的参数化思路与本文的统一框架有相似之处，但仅覆盖BSM和CEV两种模型，未涉及Heston。
+Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格与Greeks的同步计算。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，通过对模型参数和合约特征的联合参数化，实现了训练一次、多参数组合即时定价。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。
 
-Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格、Greeks和局部波动率曲面的同步计算，验证了PINN在一族扩展Black-Scholes方程上的通用性。该工作的主要贡献在于同时计算Greeks（Delta、Gamma、Vega等），利用了PINN自动微分的天然优势。针对Heston随机波动率模型，Hainaut和Casas\cite{hainaut2024heston}基于Feynman-Kac方程构建了参数化PINN，通过对模型参数和合约特征（到期日）的联合参数化，实现了训练一次、多参数组合即时定价，相比蒙特卡洛和FFT方法具有显著的推断速度优势。该工作是目前最接近本文的Heston PINN工作，但其方法依赖于特殊的网络结构，且未与BSM/CEV统一。在约束处理方面，Guo等人\cite{guo2024icpinn}提出了改进约束PINN（Improved Constrained PINN，简记为ICPINN），通过输出变换将终值条件硬编码进网络结构，使终值条件精确满足而非近似满足，从而减少损失函数中的冲突项，加速收敛。本文借鉴了ICPINN的硬约束思路，通过加法参数化输出自然满足终值条件。
+\subsection{三种独立PINN的复现与基准建立}\label{subsec:reproduction}
 
-\subsection{三种独立 PINN 的复现与基准建立}\label{subsec:reproduction}
+为提供可靠的对比基准，本文对上述三类代表性PINN方法进行了独立复现。
 
-为了在统一框架中提供可靠的对比基准，本文对上述三类代表性 PINN 方法进行了独立复现，分别针对 BSM、CEV 和 Heston 模型各训练一个专用网络。各模型的复现策略与对原始论文的改动说明如下。
+\textbf{BSM-PINN。}严格复现Dhiman和Hu\cite{dhiman2023pinn}的门控网络结构：浅层分支（2层$\times$64神经元，Tanh）与深层分支（4层$\times$64神经元，Tanh）通过可学习的sigmoid门加权融合，输入为归一化的$(S/S_{\max},\,t/T)$，输出为归一化期权价值$u=V/K$。相对于原论文，做了两处工程改动：（1）将上边界采样区间从单点$S_{\max}$扩展为$[0.8S_{\max},\,S_{\max}]$的均匀分布；（2）采用CosineAnnealingLR学习率调度（从$10^{-3}$衰减至$10^{-5}$）。以BSM解析解为参考，在$S\in[60,160]$、$t=0$处评估，MAE=0.016，RelMAE=0.6\%。
 
-\textbf{BSM-PINN。} 严格复现 Dhiman 和 Hu\citep{dhiman2023pinn} 提出的门控网络（Gated PINN）结构：浅层分支（2 层 $\times$ 64 神经元，Tanh）与深层分支（4 层 $\times$ 64 神经元，Tanh）通过可学习的 sigmoid 门加权融合，网络输入为归一化的 $(S/S_{\max},\,t/T)$，输出为归一化期权价值 $u=V/K$。损失函数包含 BSM 方程残差、终值条件（看涨期权收益）及上下边界条件。相对于原论文，本文做了两处工程改动：（1）将上边界采样区间从单点 $S_{\max}$ 扩展为 $[0.8S_{\max},\,S_{\max}]$ 的均匀分布，使网络在深度实值区域学习到正确的渐近行为；（2）采用 CosineAnnealingLR 学习率调度（从 $10^{-3}$ 衰减至 $10^{-5}$），相比固定学习率收敛更平稳。以 BSM 解析解为参考，在 $S\in[60,160]$、$t=0$ 处评估，MAE 为 0.016，RelMAE 为 0.6\%，优于原论文报告的精度。
-
-\textbf{CEV-PINN。} 网络结构采用 Dhiman 和 Hu\citep{dhiman2023pinn} 的门控网络（hidden=64），CEV PDE 的 PINN 求解参照 Zamxaka\citep{zamxaka2023cev} 的工作，将扩散系数替换为 $\sigma^2 S^{2\beta}$，参数取 $\sigma=0.25$、$\beta=0.5$。与 Zamxaka 原论文一致，本文采用 \textbf{Schroder\citep{schroder1989computing} 非中心卡方分布解析解}作为参考基准：当 $\beta=0.5$ 时，CEV 欧式看涨期权价格可表示为
+\textbf{CEV-PINN。}网络结构采用Dhiman和Hu\cite{dhiman2023pinn}的门控网络（hidden=64），将扩散系数替换为$\sigma^2 S^{2\beta}$，参数取$\sigma=0.20$、$\beta=0.5$。参考基准采用Schroder\cite{schroder1989computing}非中心卡方分布解析解：当$\beta=0.5$时，CEV欧式看涨期权价格为
 \begin{equation}
   C = S_0\bigl[1 - F(\lambda K^{2(1-\beta)};\,d,\,\lambda S_0^{2(1-\beta)}e^{2r(1-\beta)T})\bigr]
     - Ke^{-rT} F\!\bigl(\lambda S_0^{2(1-\beta)}e^{2r(1-\beta)T};\,d-2,\,\lambda K^{2(1-\beta)}\bigr),
 \end{equation}
-其中 $F(\cdot;\,d,\,\lambda)$ 为自由度 $d=2+1/(1-\beta)$、非中心参数 $\lambda=2r/[\sigma^2(1-\beta)(e^{2r(1-\beta)T}-1)]$ 的非中心卡方累积分布函数，可由 \texttt{scipy.stats.ncx2} 精确计算（精度达机器精度 $\sim10^{-15}$）。以该解析解评估，MAE 为 0.074，RelMAE 为 1.69\%（仅统计 $V^*>0.5$ 的区域）。
+其中$F(\cdot;\,d,\,\lambda)$为自由度$d=2+1/(1-\beta)$、非中心参数$\lambda=2r/[\sigma^2(1-\beta)(e^{2r(1-\beta)T}-1)]$的非中心卡方累积分布函数，可由\texttt{scipy.stats.ncx2}精确计算（精度$\sim10^{-15}$）。评估结果：MAE=0.074，RelMAE=1.69\%（仅统计$V^*>0.5$的区域）。
 
-\textbf{Heston-ICPINN。} 严格按照 Tan 和 Zhang\citep{guo2024icpinn} 的 ICPINN 方法复现，采用双网络结构：辅助网络（AuxNet，3 层 $\times$ 40 神经元，ELU 激活）预训练以满足 Dirichlet 边界条件，主网络（MainNet，8 层 $\times$ 40 神经元，Tanh 激活，glorot\_normal 初始化）学习 PDE 内部解。试验解形式为：
+\textbf{Heston-ICPINN。}严格按照Tan和Zhang\cite{guo2024icpinn}的ICPINN方法复现，采用双网络结构：辅助网络（AuxNet，3层$\times$40神经元，ELU激活）预训练以满足Dirichlet边界条件，主网络（MainNet，8层$\times$40神经元，Tanh激活）学习PDE内部解。试验解形式为：
 \begin{equation}\label{eq:icpinn_trial}
   U(S,v,\tau) = \phi(S) + S_n\tau_n \cdot \bigl[A(S_n,v_n,\tau_n) + \mathrm{NN}(S_n,v_n,\tau_n)\bigr],
 \end{equation}
-其中 $\phi(S)=\max(S-K,0)$ 为解析嵌入的终值条件，$S_n=S/S_{\max}$，$\tau_n=\tau/T$ 为归一化变量，$S_n\tau_n$ 在 $\tau=0$ 和 $S=0$ 处自动为零，从而将 Dirichlet 边界条件硬编码进网络结构。训练参数严格遵循论文设置：$K=100$，$r=0.1$，$\kappa=1$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$，$S_{\max}=4K$，$v_{\max}=1$，内部配点 $N_r=10000$，边界配点 $N_{bc}=500$，Adam 优化器，初始学习率 $10^{-3}$，StepLR 调度（$\gamma=0.75$，每 5000 步），共训练 20000 轮。以 Heston 特征函数半解析解为参考，在 $S\in[60,160]$、$t=0$、$v=v_0=0.04$ 处评估，MAE 为 0.35，RelMAE 为 3.9\%（仅统计实值期权）。
+其中$\phi(S)=\max(S-K,0)$为解析嵌入的终值条件，$S_n\tau_n$在$\tau=0$和$S=0$处自动为零，从而将Dirichlet边界条件硬编码进网络结构。训练参数严格遵循论文设置：$K=100$，$r=0.1$，$\kappa=1$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$，内部配点$N_r=10000$，边界配点$N_{bc}=500$，Adam优化器，初始学习率$10^{-3}$，StepLR调度（$\gamma=0.75$，每5000步），共训练20000轮。评估结果：MAE=0.35，RelMAE=3.9\%（仅统计实值期权）。
 
-然而，ICPINN 方法存在一个关键局限：其收敛性对参数集高度敏感。当将参数替换为统一框架所需的参数集（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$）时，训练无法收敛。根本原因在于 Fichera 退化边界条件（$v=0$ 处）：在 $\kappa\theta$ 较小时，该边界条件的损失项主导整体损失（约为 PDE 残差的 40 倍），而 aux\_net 已被冻结，main\_net 无法独立修正此偏差。为解决这一问题，本文在独立 Heston-PINN 中引入了\textbf{数据锚点机制}：在 $t=0$ 处预计算 GL 特征函数半解析价格作为监督信号，以权重 $w_\text{data}=100$ 加入损失函数，将解锁定在正确分支上，从而在任意参数集下均能稳定收敛。这一改进是将独立 Heston-PINN 纳入统一框架对比实验的必要前提。
+然而，ICPINN方法的收敛性对参数集高度敏感。当将参数替换为统一框架所需的参数集（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$）时，训练无法收敛。根本原因在于Fichera退化边界条件（$v=0$处）：在$\kappa\theta$较小时，该边界条件的损失项主导整体损失（约为PDE残差的40倍），而aux\_net已被冻结，main\_net无法独立修正此偏差。为解决这一问题，本文在独立Heston-PINN中引入\textbf{数据锚点机制}：在$t=0$处预计算GL特征函数半解析价格作为监督信号，以权重$w_\text{data}=100$加入损失函数，将解锁定在正确分支上，从而在任意参数集下均能稳定收敛。
 
-三种独立 PINN 的复现结果汇总于表~\ref{tab:reproduction}。
+三种独立PINN的复现结果汇总于表~\ref{tab:reproduction}。
 
 \begin{table}[htbp]
   \centering
-  \caption{三种独立 PINN 复现结果（$S\in[60,160]$，$t=0$）}
+  \caption{三种独立PINN复现结果（$S\in[60,160]$，$t=0$）}
   \label{tab:reproduction}
   \begin{tabular}{lcccc}
     \hline
     模型 & 参考基准 & MAE & RelMAE & 网络结构 \\
     \hline
-    BSM-PINN   & 解析解           & 0.016 & 0.6\%  & 门控网络，2+4层$\times$64，Tanh \\
-    CEV-PINN   & 非中心卡方解析解 & 0.074 & 1.69\% & 门控网络，2+4层$\times$64，Tanh \\
+    BSM-PINN      & 解析解           & 0.016 & 0.6\%  & 门控网络，2+4层$\times$64，Tanh \\
+    CEV-PINN      & 非中心卡方解析解 & 0.074 & 1.69\% & 门控网络，2+4层$\times$64，Tanh \\
     Heston-ICPINN & 特征函数半解析解 & 0.35  & 3.9\%  & AuxNet(3$\times$40)+MainNet(8$\times$40) \\
     \hline
   \end{tabular}
 \end{table}
 
-上述三个独立 PINN 验证了各模型 PDE 的可解性，并为后续统一框架提供了精度基准。
+上述三个独立PINN验证了各模型PDE的可解性，并为后续统一框架提供了精度基准。
 
 \subsection{现有工作的局限性}
 
-综合上述工作，现有PINN期权定价研究存在两方面不足：各研究针对单一模型（BSM或Heston），缺乏统一框架同时支持多种定价模型；用户需手动指定模型类型和参数，无法通过自然语言描述需求。基于上述不足，本文提出将三大模型统一为单一参数化PINN的方法，具体设计见第~\ref{chap:method}章。
+综合上述工作，现有PINN期权定价研究存在两方面不足：各研究针对单一模型，缺乏统一框架同时支持多种定价模型；用户需手动指定模型类型和参数，无法通过自然语言描述需求。本文针对上述不足，提出将三大模型统一为单一参数化PINN的方法，具体设计见第~\ref{chap:method}章。
 
 \section{大语言模型辅助科学计算}\label{sec:llm_sci}
 
-大语言模型（Large Language Models，简记为LLM）在科学计算领域的应用近年来取得了显著进展。Liu等人\cite{liu2025pdeagent}提出了PDE-AGENT，一个工具链增强的多智能体框架，能够从自然语言描述出发，自动调用数值求解工具完成PDE的求解，并通过双循环纠错机制处理工具调用失败的情况。该工作表明LLM具备理解PDE问题结构、选择合适求解策略的能力。在金融领域，Xiao等人\cite{xiao2024tradingagents}提出了TradingAgents框架，通过多个专业化LLM智能体的协作完成金融交易决策，验证了LLM在金融场景下的参数提取与任务路由能力。
+Liu等人\cite{liu2025pdeagent}提出了PDE-AGENT，一个工具链增强的多智能体框架，能够从自然语言描述出发，自动调用数值求解工具完成PDE的求解。该工作表明LLM具备理解PDE问题结构、选择合适求解策略的能力。在金融领域，Xiao等人\cite{xiao2024tradingagents}提出了TradingAgents框架，通过多个专业化LLM智能体的协作完成金融交易决策，验证了LLM在金融场景下的参数提取与任务路由能力。
 
-LLM在结构化信息提取方面的能力是本文LLM路由层的核心依赖。现代LLM（如GPT-4、DeepSeek等）能够通过约束输出格式（如JSON模式）可靠地从自然语言中提取结构化参数，这一能力使得LLM作为"智能路由层"具有良好的可行性：通过解析用户的自然语言输入，提取期权类型和定价参数，并将任务分发至对应的PINN求解器，可以显著降低期权定价工具的使用门槛。与PDE-AGENT\cite{liu2025pdeagent}相比，本文的LLM路由层设计更为轻量：LLM仅负责参数提取和模型选择，不参与PDE求解过程，因此延迟更低（约500ms至2000ms的API调用，而非多轮工具调用）、可靠性更高（结构化JSON输出避免了自由文本解析的不确定性）。
+现代LLM（如GPT-4、DeepSeek等）能够通过约束输出格式（如JSON模式）可靠地从自然语言中提取结构化参数。本文的LLM路由层设计较PDE-AGENT更为轻量：LLM仅负责参数提取和模型选择，不参与PDE求解过程，因此延迟更低（约500ms至2000ms的API调用）、可靠性更高（结构化JSON输出避免了自由文本解析的不确定性）。
 
 \section{本章小结}\label{sec:related_summary}
 
-本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式及其特性，回顾了PINN在期权定价中的代表性工作，并介绍了LLM辅助科学计算的最新进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。在此基础上，本文构建了LLM与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}章。
+本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式，回顾了PINN在期权定价中的代表性工作，并介绍了LLM辅助科学计算的进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。本文在此基础上构建了LLM与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}章。

@@ -1,7 +1,5 @@
 \chapter{实验}\label{chap:experiment}
 
-本章报告统一PINN框架的实验结果。在第~\ref{sec:exp_setup}节中，介绍实验设置；在第~\ref{sec:training_analysis}节中，分析训练过程；在第~\ref{sec:accuracy}节中，评估定价精度；在第~\ref{sec:speed}节中，报告推断速度；在第~\ref{sec:llm_eval}节中，评估LLM路由层的准确率；在第~\ref{sec:ablation}节中，通过消融实验验证各设计组件的必要性；在第~\ref{sec:market_validation}节中，基于真实SPY期权市场数据进行模型对比验证。
-
 \section{实验设置}\label{sec:exp_setup}
 
 \subsection{模型参数}
@@ -240,9 +238,7 @@
 
 \subsubsection{PINN-BSM的泛化能力}
 
-PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力。这一结果优于预期：v15版本的BSM训练参数覆盖$\sigma\in[0.13,0.30]$，而真实市场的$\sigma^*$在0.13至0.17之间，恰好落在训练范围内，因此PINN-BSM能够精确复现校准BSM的定价结果。
-
-特别地，PINN-BSM的误差随$T$的变化趋势与BSM完全一致，说明网络正确学习了BSM的定价结构，并能在无需重新训练的情况下对真实市场参数给出与校准BSM等价的定价结果，验证了统一框架的泛化能力。
+PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力。v15版本的BSM训练参数覆盖$\sigma\in[0.13,0.30]$，而真实市场的$\sigma^*$在0.13至0.17之间，恰好落在训练范围内，因此PINN-BSM能够精确复现校准BSM的定价结果，验证了统一框架的参数泛化性。
 
 \subsubsection{PINN-Heston的局限性分析}
 
@@ -260,18 +256,15 @@ PINN-Heston的MAE显著高于校准Heston（高出3至37美元），这是本实
 
 \section{独立PINN与统一PINN精度对比}\label{sec:compare}
 
-为验证统一框架的有效性，本节对比独立PINN与统一PINN的定价精度。
+为验证统一框架的有效性，本节在相同参数集下对比独立PINN与统一PINN的定价精度。
 评估点取$S\in[60,160]$，共50个均匀采样点，$t=0$。
 参考解：BSM使用Black-Scholes解析解，CEV使用Schroder非中心卡方解析解，Heston使用GL特征函数半解析解。
-
-BSM和CEV独立PINN与统一PINN使用相同参数（$\sigma=0.20$，$\beta=0.5$，$K=100$，$T=1$，$r=0.05$）。
-独立Heston-PINN严格复现Tan和Zhang\citep{guo2024icpinn}的原始参数（$r=0.1$，$\kappa=1.0$，$\theta=0.08$，$\xi=0.39$，$\rho=-0.93$），
-统一PINN的Heston评估使用统一框架的训练参数（$r=0.05$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），
-各自在其训练参数下评估，以反映各模型的实际精度水平。
+所有方法均使用统一参数集（BSM：$\sigma=0.20$；CEV：$\sigma=0.20$，$\beta=0.5$；Heston：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$；公共参数：$K=100$，$T=1$，$r=0.05$）。
+独立Heston-PINN在此参数集下重新训练，引入GL数据锚点机制以确保收敛（见第~\ref{subsec:reproduction}节）。
 
 \begin{table}[htbp]
   \centering
-  \caption{独立PINN与统一PINN精度对比（$S\in[60,160]$，$t=0$）}
+  \caption{独立PINN与统一PINN精度对比（$S\in[60,160]$，$t=0$，统一参数集）}
   \label{tab:compare}
   \begin{tabular}{llccc}
     \hline
@@ -279,7 +272,7 @@ BSM和CEV独立PINN与统一PINN使用相同参数（$\sigma=0.20$，$\beta=0.5$
     \hline
     独立BSM-PINN   & BS解析解       & 0.087 & 0.114 & 2.98\% \\
     独立CEV-PINN   & Schroder解析解 & 0.102 & 0.131 & 1.88\% \\
-    独立Heston-PINN$^\dagger$ & GL半解析解 & 0.367 & 0.387 & 3.92\% \\
+    独立Heston-PINN & GL半解析解    & 0.383 & 0.491 & 9.91\% \\
     \hline
     统一PINN（BSM）   & BS解析解       & 0.003 & 0.005 & 0.065\% \\
     统一PINN（CEV）   & Schroder解析解 & 0.037 & 0.049 & 0.887\% \\
@@ -288,13 +281,11 @@ BSM和CEV独立PINN与统一PINN使用相同参数（$\sigma=0.20$，$\beta=0.5$
   \end{tabular}
 \end{table}
 
-$^\dagger$ 独立Heston-PINN使用Tan和Zhang\citep{guo2024icpinn}原始参数（$r=0.1$，$\kappa=1.0$，$\xi=0.39$，$\rho=-0.93$）训练与评估，
-统一PINN使用不同的Heston参数集（$r=0.05$，$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）。
-两者参数不同，不构成直接对比，但均反映各自在训练参数下的精度水平。
-
-从表~\ref{tab:compare}可以看出，统一PINN在BSM和CEV模型上的精度显著优于对应的独立PINN：
-BSM的RelMAE从2.98\%降至0.065\%（提升约46倍），CEV从1.88\%降至0.887\%（提升约2.1倍）。
-这表明统一框架的软掩码机制不仅实现了多模型的统一求解，还通过参数共享提升了各子模型的精度。
+从表~\ref{tab:compare}可以看出，统一PINN在三种模型上的精度均显著优于对应的独立PINN：
+BSM的RelMAE从2.98\%降至0.065\%（提升约46倍），CEV从1.88\%降至0.887\%（提升约2.1倍），
+Heston的MAE从0.383降至0.036（降幅91\%）。
+独立Heston-PINN的高误差（RelMAE=9.91\%）反映了纯PDE约束在二维退化方程上的收敛困难；
+统一框架通过软掩码机制和数据锚点的协同作用，将Heston精度提升至与BSM/CEV相当的水平。
 
 图~\ref{fig:compare}展示了三种模型的价格曲线对比。
 
@@ -357,4 +348,4 @@ Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高
 
 \section{本章小结}\label{sec:exp_summary}
 
-本章通过系统实验验证了统一PINN框架的有效性。统一PINN（v15）在三大模型上均达到实用精度：BSM（MAE=0.021，ATM相对误差0.21\%）、CEV（MAE=0.065，ATM相对误差0.81\%）、Heston（MAE=0.034，ATM相对误差0.38\%）；相比早期版本，BSM精度提升68\%，CEV的ATM相对误差从37.95\%降至0.81\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。真实市场回测（SPY期权链，2394个合约，34个到期日）表明：校准Heston和CEV在中长期期权（$T>0.25$年）上显著优于BSM，Heston MAE最低可达BSM的32\%（Mar 19 2027：Heston 1.22 vs BSM 3.78）；PINN-BSM在训练参数范围内具有优异的泛化能力，MAE与校准BSM几乎相同（差距$<0.1$美元），验证了统一框架的参数泛化性；PINN-Heston因真实市场参数（$\kappa$可达15，$\xi$可低至0.01，$\rho$可达$-0.98$）超出v15训练范围，且受制于统一框架的网络容量瓶颈，定价误差较大，进一步的架构改进是重要的未来工作方向。
+统一PINN（v15）在三大模型上均达到实用精度：BSM（MAE=0.021，ATM相对误差0.21\%）、CEV（MAE=0.065，ATM相对误差0.81\%）、Heston（MAE=0.034，ATM相对误差0.38\%）。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。真实市场回测（SPY期权链，2394个合约，34个到期日）表明：校准Heston和CEV在中长期期权（$T>0.25$年）上显著优于BSM；PINN-BSM在训练参数范围内具有优异的泛化能力；PINN-Heston因真实市场参数超出训练范围且受制于网络容量瓶颈，定价误差较大，进一步的架构改进是重要的未来工作方向。
