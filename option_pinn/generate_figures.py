@@ -91,177 +91,115 @@ def fig_soft_mask():
 
 # ── 2. System Architecture ────────────────────────────────────────────────────
 def fig_architecture():
-    """
-    Topology (top → bottom):
-      Layer 1 – Interaction:
-        [用户输入] → [LLM路由层] → [结构化JSON]
-                                        ↓
-      Layer 2 – Solver (dashed box):
-        [软掩码] ──→ [加法参数化输出]
-                          ↑
-                    [统一PDE算子]
-        [数据锚点] ──→ (dashed, right side, training only)
-                                        ↓
-      Layer 3 – Output:
-        [期权价格 + Greeks]  (~2ms badge)
-    """
-    W, H = 13.0, 8.0
-    fig, ax = plt.subplots(figsize=(W, H))
-    ax.set_xlim(0, W); ax.set_ylim(0, H)
+    fig, ax = plt.subplots(figsize=(12, 7))
+    W, H = 12, 7
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
     ax.axis("off")
 
-    # ── palette ──────────────────────────────────────────────────────────────
-    LPURPLE = "#F3E5F5"; LYELLOW = "#FFF8E1"; LGREEN  = "#E8F5E9"
-    LBLUE   = "#E3F2FD"; LCYAN   = "#E0F7FA"; LRED    = "#FCE4EC"
-    LINDIGO = "#E8EAF6"
-    EC_PUR  = "#7B1FA2"; EC_ORG  = "#E65100"; EC_GRN  = "#2E7D32"
-    EC_BLU  = "#1565C0"; EC_CYN  = "#00838F"; EC_RED  = "#C62828"
-    EC_IND  = "#3949AB"
+    PURPLE = "#6A1B9A"
+    LBLUE  = "#E3F2FD"
+    LGREEN = "#E8F5E9"
+    LRED   = "#FCE4EC"
+    LYELLOW= "#FFF8E1"
+    LGRAY  = "#F5F5F5"
 
-    # ── helpers ──────────────────────────────────────────────────────────────
-    def rbox(cx, cy, w, h, lines, fc, ec, fs=9.0, bold=False, lw=1.4):
-        ax.add_patch(FancyBboxPatch(
-            (cx - w/2, cy - h/2), w, h,
-            boxstyle="round,pad=0.13", facecolor=fc, edgecolor=ec,
-            linewidth=lw, zorder=2))
-        ax.text(cx, cy, "\n".join(lines), ha="center", va="center",
-                fontsize=fs, fontweight="bold" if bold else "normal",
-                linespacing=1.55, zorder=3)
+    def box(x, y, w, h, lines, fc=LBLUE, ec=C1, fs=9.5, bold=False,
+            style="round,pad=0.15", lw=1.8):
+        rect = FancyBboxPatch((x - w/2, y - h/2), w, h,
+                              boxstyle=style, facecolor=fc, edgecolor=ec,
+                              linewidth=lw, zorder=2)
+        ax.add_patch(rect)
+        txt = "\n".join(lines)
+        ax.text(x, y, txt, ha="center", va="center", fontsize=fs,
+                fontweight="bold" if bold else "normal",
+                linespacing=1.5, zorder=3)
 
-    def dbox(x0, y0, x1, y1, ec, label="", lc=GRAY):
-        """Draw dashed box by corners."""
-        cx, cy = (x0+x1)/2, (y0+y1)/2
-        w, h   = x1-x0, y1-y0
-        ax.add_patch(FancyBboxPatch(
-            (x0, y0), w, h,
-            boxstyle="round,pad=0.08", facecolor="#F5F8FF", edgecolor=ec,
-            linewidth=1.4, linestyle="--", zorder=1))
+    def dashed_rect(x, y, w, h, ec="#888888", label=""):
+        rect = FancyBboxPatch((x - w/2, y - h/2), w, h,
+                              boxstyle="round,pad=0.1",
+                              facecolor="#FAFAFA", edgecolor=ec,
+                              linewidth=1.2, linestyle="--", zorder=1)
+        ax.add_patch(rect)
         if label:
-            ax.text(x0 + 0.22, y1 - 0.18, label,
-                    fontsize=8.5, color=lc, va="top", fontweight="bold", zorder=3)
+            ax.text(x - w/2 + 0.15, y + h/2 - 0.18, label,
+                    fontsize=7.5, color=ec, va="top", zorder=3)
 
-    def arr(x1, y1, x2, y2, col=GRAY, lw=1.6, dashed=False):
-        ls = "dashed" if dashed else "solid"
+    def arr(x1, y1, x2, y2, col="#444444", lw=1.8, label="", lfs=8):
         ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                    arrowprops=dict(arrowstyle="-|>", color=col, lw=lw,
-                                   mutation_scale=14,
-                                   linestyle=ls), zorder=4)
+                    arrowprops=dict(arrowstyle="-|>", color=col,
+                                   lw=lw, mutation_scale=15), zorder=4)
+        if label:
+            mx, my = (x1+x2)/2, (y1+y2)/2
+            ax.text(mx+0.08, my, label, fontsize=lfs, color=col, va="center")
 
-    def arr_mid_label(x1, y1, x2, y2, txt, col=GRAY, lw=1.4, dx=0.10, dy=0.0):
-        arr(x1, y1, x2, y2, col=col, lw=lw, dashed=True)
-        ax.text((x1+x2)/2 + dx, (y1+y2)/2 + dy, txt,
-                fontsize=8, color=col, va="center", ha="left", zorder=5)
+    # ── Layer 1: Interaction (top) ──────────────────────────────────────────
+    Y1 = 6.0
+    box(1.6,  Y1, 2.4, 0.72,
+        ["Natural Language Input", "(Chinese / English)"],
+        fc="#F3E5F5", ec=PURPLE, fs=9)
+    box(5.0,  Y1, 3.2, 0.72,
+        ["LLM Router", "param extraction  +  model selection"],
+        fc=LYELLOW, ec=C4, fs=9, bold=True)
+    box(9.2,  Y1, 2.8, 0.72,
+        ["Structured JSON",
+         r"$\{$model, $S$, $K$, $T$, $r$, $\boldsymbol{\lambda}\}$"],
+        fc=LGREEN, ec=C3, fs=9)
 
-    def layer_label(yc, txt, col):
-        ax.text(0.30, yc, txt, fontsize=8.5, color=col,
-                ha="center", va="center", rotation=90, fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.28", facecolor="white",
-                          edgecolor=col, linewidth=0.9, alpha=0.92), zorder=5)
+    arr(2.8,  Y1, 3.4,  Y1, col="#555555")
+    arr(6.6,  Y1, 7.8,  Y1, col="#555555")
 
-    def band(yc, h, fc):
-        ax.add_patch(FancyBboxPatch(
-            (0.55, yc - h/2), W - 0.65, h,
-            boxstyle="round,pad=0.05", facecolor=fc,
-            edgecolor="none", zorder=0, alpha=0.45))
+    # ── Layer 2: PINN Solver (middle) ───────────────────────────────────────
+    Y2 = 3.8
+    # outer PINN box
+    dashed_rect(5.5, Y2, 7.6, 2.2, ec=C1, label="Unified PINN Solver")
 
-    # ── Y coordinates (top → bottom) ─────────────────────────────────────────
-    # Layer 1 (Interaction): centred at Y1=6.8
-    # Layer 2 (Solver):      centred at Y2=4.0, height=2.8 → y: 2.6 to 5.4
-    # Layer 3 (Output):      centred at Y3=1.2
-    Y1 = 6.80
-    Y2 = 3.90   # solver centre
-    SY_TOP = 5.30; SY_BOT = 2.55   # solver dashed box top/bottom
-    Y3 = 1.20
+    # inner: soft mask
+    box(3.5, Y2+0.35, 2.2, 0.72,
+        ["Soft Mask",
+         r"$\mathrm{mask}=\tanh^2(\xi/0.05)$"],
+        fc="#E8EAF6", ec="#3949AB", fs=8.5)
 
-    band(Y1, 1.10, "#F8F0FF")
-    band(Y2, SY_TOP - SY_BOT + 0.20, "#EEF2FF")
-    band(Y3, 0.95, "#F0FFF4")
+    # inner: additive parameterization
+    box(6.2, Y2+0.35, 2.8, 0.72,
+        ["Additive Output",
+         r"$\hat{V}=V_{\rm BS}(\sigma_{\rm eff})+K\cdot\mathrm{Net}(\mathbf{x})$"],
+        fc=LBLUE, ec=C1, fs=8.5)
 
-    # ── Layer 1: Interaction ──────────────────────────────────────────────────
-    # x positions: User=1.8, LLM=5.2, JSON=9.0  (total span ~0.7 to 11.0)
-    X_USR = 1.80; X_LLM = 5.20; X_JSON = 9.00
+    # inner: unified PDE
+    box(5.5, Y2-0.55, 5.2, 0.62,
+        [r"Unified PDE: BSM $(\xi{=}0)$ $\to$ CEV $\to$ Heston $(\xi{\uparrow})$"],
+        fc="#E0F7FA", ec="#00838F", fs=8.5)
 
-    rbox(X_USR, Y1, 2.40, 0.80,
-         ["用户输入", "(CN / EN)"], LPURPLE, EC_PUR, fs=9)
-    rbox(X_LLM, Y1, 3.40, 0.80,
-         ["LLM 路由层", "参数提取 & 模型选择"],
-         LYELLOW, EC_ORG, fs=9, bold=True)
-    rbox(X_JSON, Y1, 2.60, 0.80,
-         ["结构化 JSON", r"{model, S, K, T, r, $\lambda$}"],
-         LGREEN, EC_GRN, fs=9)
+    arr(4.6, Y2+0.35, 4.8, Y2+0.35, col="#3949AB")   # mask → additive
+    arr(5.5, Y2-0.0,  5.5, Y2-0.24, col="#00838F")    # additive → PDE
 
-    arr(X_USR + 1.20, Y1, X_LLM - 1.70, Y1)   # User → LLM
-    arr(X_LLM + 1.70, Y1, X_JSON - 1.30, Y1)   # LLM  → JSON
+    # Data anchors (right, training-time only)
+    box(10.6, Y2, 2.0, 1.5,
+        ["Data Anchors", "(training only)",
+         "BSM: analytic", "CEV: Schroder", "Heston: GL"],
+        fc=LRED, ec=C2, fs=8.2)
+    arr(9.6, Y2, 9.3, Y2, col=C2, lw=1.4, label="supervise")
 
-    # ── JSON → Solver: vertical arrow down from JSON to solver top ────────────
-    arr(X_JSON, Y1 - 0.40, X_JSON, SY_TOP + 0.08, col=GRAY, lw=1.6)
+    # arrow: JSON → PINN
+    arr(9.2, Y1-0.36, 7.5, Y2+1.1+0.11, col="#555555")
 
-    # ── Layer 2: Solver dashed box ────────────────────────────────────────────
-    # Solver spans x: 0.70 to 10.50
-    SX_L = 0.70; SX_R = 10.50
-    dbox(SX_L, SY_BOT, SX_R, SY_TOP, EC_BLU, "统一 PINN 求解器", lc=EC_BLU)
+    # ── Layer 3: Output (bottom) ────────────────────────────────────────────
+    Y3 = 1.55
+    box(5.5, Y3, 5.0, 0.72,
+        ["Option Price  +  Greeks  (Delta, Gamma, Vega, ...)"],
+        fc=LGREEN, ec=C3, fs=9.5, bold=True)
 
-    # Inner nodes:
-    #   Top row (y=Y2+0.62): [软掩码 cx=2.6] → [加法参数化输出 cx=6.2]
-    #   Bottom row (y=Y2-0.55): [统一PDE cx=4.4]  ↑ arrow to Additive Output
-    #   Right side (y=Y2): [数据锚点 cx=9.5] dashed arrow left into solver
+    arr(5.5, Y2-1.1, 5.5, Y3+0.36, col=C1, lw=2.0)
 
-    YT = Y2 + 0.62   # top inner row
-    YB = Y2 - 0.55   # bottom inner row
-
-    X_MASK = 2.60
-    X_ADD  = 6.20
-    X_PDE  = 4.40
-    X_ANC  = 9.20
-
-    rbox(X_MASK, YT, 2.80, 0.80,
-         ["软掩码", r"mask $= \tanh^2(\xi/0.05)$",
-          r"$\xi\!=\!0$: BSM/CEV  |  $\xi\!>\!0$: Heston"],
-         LINDIGO, EC_IND, fs=8.5)
-
-    rbox(X_ADD, YT, 3.40, 0.80,
-         ["加法参数化输出",
-          r"$\hat{V}=V_{\rm BS}(\sigma_{\rm eff})+K\!\cdot\!{\rm Net}(\mathbf{x})$",
-          r"6 $\times$ 128 tanh 网络"],
-         LBLUE, EC_BLU, fs=8.5)
-
-    rbox(X_PDE, YB, 5.20, 0.72,
-         [r"统一 PDE 算子",
-          r"$\xi\!=\!0$: BSM/CEV（一维）$\quad|\quad$ $\xi\!>\!0$: Heston（二维随机波动率）"],
-         LCYAN, EC_CYN, fs=8.5)
-
-    rbox(X_ANC, Y2, 2.00, 1.60,
-         ["数据锚点", "(仅训练期)",
-          "BSM: 解析解", "CEV: Schroder", "Heston: GL"],
-         LRED, EC_RED, fs=8.2)
-
-    # Soft Mask → Additive Output (horizontal)
-    arr(X_MASK + 1.40, YT, X_ADD - 1.70, YT, col=EC_IND, lw=1.5)
-
-    # Unified PDE → Additive Output (upward, aligned under Additive Output)
-    arr(X_ADD, YB + 0.36, X_ADD, YT - 0.40, col=EC_CYN, lw=1.5)
-
-    # Data Anchors → solver interior (dashed, leftward)
-    arr_mid_label(X_ANC - 1.00, Y2, SX_R - 3.60, Y2,
-                  "监督", col=EC_RED, lw=1.3, dx=-0.55, dy=0.12)
-
-    # ── Solver → Output ───────────────────────────────────────────────────────
-    arr(5.50, SY_BOT - 0.08, 5.50, Y3 + 0.40, col=EC_BLU, lw=2.0)
-
-    # ── Layer 3: Output ───────────────────────────────────────────────────────
-    rbox(5.50, Y3, 6.00, 0.78,
-         ["期权价格 + Greeks  (Delta, Gamma, Vega, Theta)"],
-         LGREEN, EC_GRN, fs=9.5, bold=True)
-
-    ax.text(9.20, Y3, "~2 ms / query", fontsize=8.5, color="#555555",
-            va="center", ha="left",
-            bbox=dict(boxstyle="round,pad=0.32", facecolor="#F5F5F5",
-                      edgecolor="#CCCCCC", linewidth=0.8))
-
-    # ── Layer labels ──────────────────────────────────────────────────────────
-    layer_label(Y1, "交互层", EC_PUR)
-    layer_label(Y2, "求解层", EC_BLU)
-    layer_label(Y3, "输出层", EC_GRN)
+    # ── Layer labels (left margin) ──────────────────────────────────────────
+    for ytxt, lbl, col in [
+        (Y1,   "Interaction", PURPLE),
+        (Y2,   "Solver",      C1),
+        (Y3,   "Output",      C3),
+    ]:
+        ax.text(0.12, ytxt, lbl, fontsize=8, color=col, va="center",
+                rotation=90, ha="center")
 
     fig.tight_layout(pad=0.4)
     savefig(fig, "architecture.pdf")
