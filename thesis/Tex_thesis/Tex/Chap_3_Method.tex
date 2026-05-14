@@ -1,5 +1,12 @@
 \chapter{方法}\label{chap:method}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{Img/architecture.pdf}
+  \caption{统一期权定价框架系统架构。用户以自然语言输入期权需求，LLM路由层自动完成参数提取与模型选择，输出结构化JSON；统一PINN求解器接收参数向量$\boldsymbol{\lambda}=(\sigma,\beta,\kappa,\theta,\xi,\rho)$，基于软掩码机制和加法参数化输出，一次前向传播（$\sim$2ms）即可完成定价并输出Greeks。数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号。}
+  \label{fig:architecture}
+\end{figure}
+
 \section{三大期权定价模型}\label{sec:three_models}
 
 本文涉及的三大期权定价模型已在第~\ref{sec:option_models}节详细介绍，此处仅概述各模型对统一框架设计的关键影响。BSM模型（式~\eqref{eq:bsm}）以常数波动率$\sigma$为唯一随机性来源，存在封闭解析解，本文将其作为加法参数化的基线：
@@ -53,7 +60,16 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 \begin{equation}\label{eq:soft_a}
   a = (1-\text{mask})\cdot\sigma^2 S^{2\beta} + \text{mask}\cdot v S^2.
 \end{equation}
-当$\xi=0$时，$a=\sigma^2 S^{2\beta}$，精确退化为BSM/CEV扩散项；当$\xi=0.3$时，$a\approx vS^2$，精确对应Heston扩散项。软掩码的连续插值特性使网络可以学习到平滑的参数依赖关系，避免了硬切换在$\xi$附近产生的梯度不连续问题（消融实验见第~\ref{sec:ablation}节）。
+当$\xi=0$时，$a=\sigma^2 S^{2\beta}$，精确退化为BSM/CEV扩散项；当$\xi=0.3$时，$a\approx vS^2$，精确对应Heston扩散项。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{Img/soft_mask.pdf}
+  \caption{软掩码函数$\text{mask}=\tanh^2(\xi/0.05)$。当$\xi\to 0$时，$\text{mask}\to 0$，扩散系数退化为$\sigma^2 S^{2\beta}$（BSM/CEV）；当$\xi=0.3$时，$\text{mask}\approx 0.998$，扩散系数近似为$vS^2$（Heston）。函数在$\xi\in[0,0.5]$区间内平滑过渡，避免了硬切换带来的梯度不连续问题。}
+  \label{fig:soft_mask}
+\end{figure}
+
+软掩码的连续插值特性使网络可以学习到平滑的参数依赖关系，避免了硬切换在$\xi$附近产生的梯度不连续问题（消融实验见第~\ref{sec:ablation}节）。
 
 \section{加法参数化输出}\label{sec:additive_param}
 
@@ -142,6 +158,13 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 \section{LLM路由层}\label{sec:llm_router}
 
 三种定价模型分别适用于不同的市场假设，传统工具要求用户手动指定模型类型和全部数值参数。本文引入DeepSeek LLM作为智能路由层，使用户可以通过自然语言描述期权需求，由LLM自动完成模型选择和参数提取。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{Img/llm_interaction.pdf}
+  \caption{LLM路由层交互示例。用户以自然语言（中英文均可）描述期权需求，LLM通过结构化JSON输出提取全部数值参数并选择定价模型。模型选择遵循规则：仅提供$\sigma$则选BSM，提及$\beta$或CEV则选CEV，提供$\kappa,\theta,\xi,\rho$或提及Heston/随机波动率则选Heston，默认BSM。缺失参数自动填充典型默认值。参数经范围校验后传入统一PINN求解器，约2ms返回期权价格与Greeks。}
+  \label{fig:llm_interaction}
+\end{figure}
 
 系统提示词将LLM角色定义为"期权定价参数提取器"，规定模型选择规则：仅提供$\sigma$则选BSM，提及$\beta$或"CEV"则选CEV，提供$\kappa,\theta,\xi,\rho,v_0$或提及"Heston"/"stochastic volatility"则选Heston，默认BSM。对用户未提及的参数使用典型默认值（$S=100$，$K=100$，$T=1.0$，$r=0.05$，$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），并通过\texttt{response\_format: json\_object}强制输出合法JSON。LLM的输出遵循以下JSON Schema：
 \begin{verbatim}
