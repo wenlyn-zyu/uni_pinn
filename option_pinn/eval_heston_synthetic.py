@@ -14,6 +14,7 @@ Test grid: S in linspace(50, 250, 50), K=100, T=1.0, r=0.05
 """
 import sys, os
 import numpy as np
+import torch
 
 BASE = "/home/yz2026/zhuwl2022/uni_pinn/option_pinn"
 sys.path.insert(0, BASE)
@@ -21,7 +22,7 @@ sys.path.insert(0, os.path.join(BASE, "independent"))
 
 from ref_solvers import heston_call
 from heston_hainaut import HestonHainaut
-from independent.heston_pinn import Heston_PINN
+from heston_pinn import Heston_PINN
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 K_SYN = 100.0
@@ -61,16 +62,14 @@ def relmae(pred, ref):
 
 # ── Load models ───────────────────────────────────────────────────────────────
 print("Loading heston_pinn (fixed-param, HESTON_INDEP)...")
-heston_pinn = Heston_PINN(
-    K=K_SYN, T=T_SYN, r=r_INDEP,
-    kappa=HESTON_INDEP["kappa"],
-    theta=HESTON_INDEP["theta"],
-    xi=HESTON_INDEP["xi"],
-    rho=HESTON_INDEP["rho"],
-    v0=HESTON_INDEP["v0"],
-)
-heston_pinn.load(os.path.join(BASE, "results/indep_heston.pt"))
-print("  Loaded.")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+ckpt = torch.load(os.path.join(BASE, "results/indep_heston.pt"), map_location=DEVICE)
+heston_pinn = Heston_PINN(**ckpt["params"], device=DEVICE)
+heston_pinn.aux_net.load_state_dict(ckpt["aux_state"])
+heston_pinn.main_net.load_state_dict(ckpt["main_state"])
+heston_pinn.aux_net.eval()
+heston_pinn.main_net.eval()
+print("  Loaded. params:", ckpt["params"])
 
 print("Loading hainaut (parametric, original range)...")
 hainaut = HestonHainaut()
