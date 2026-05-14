@@ -1,14 +1,18 @@
 """
 Synthetic data evaluation: compare Heston PINN variants against GL reference.
 
-Both models evaluated on the same HESTON_INDEP params and S grid.
+Both models evaluated on the same params and S grid.
 
-HESTON_INDEP: kappa=1.0, theta=0.08, xi=0.39, rho=-0.93, v0=0.04, r=0.1
-  - heston_pinn: in-distribution (trained on these params)
-  - hainaut_orig: partially OOD (rho=-0.93 outside [-0.8,0.8]; r=0.1 outside [0.01,0.07])
+Test params: kappa=1.0, theta=0.08, xi=0.39, rho=-0.7, v0=0.04, r=0.05
+  - Chosen to be within Hainaut training range AND close to HESTON_INDEP
+  - Hainaut ranges: S∈[20,180], r∈[0.01,0.07], kappa∈[0.5,2.0],
+    theta∈[0.062,0.42], xi∈[0.1,0.9], rho∈[-0.8,0.8]
+  - heston_pinn trained on rho=-0.93, r=0.1 — these test params are slightly OOD for it
+  - hainaut_orig: all params in-distribution
 
 Hainaut prices PUT at K=100; price() returns absolute put price.
 Call price via put-call parity: C = P + S - K*exp(-rT)
+S grid clipped to [50, 170] to stay within Hainaut S_RANGE=[20,180].
 """
 import sys, os
 import numpy as np
@@ -24,10 +28,12 @@ from heston_pinn import Heston_PINN
 
 K_SYN  = 100.0
 T_SYN  = 1.0
-S_GRID = np.linspace(50, 250, 50)
+# Stay within Hainaut S_RANGE=[20,180] and heston_pinn S_max=400
+S_GRID = np.linspace(50, 170, 50)
 
-HESTON_INDEP = dict(kappa=1.0, theta=0.08, xi=0.39, rho=-0.93, v0=0.04)
-r_INDEP = 0.1
+# Params within Hainaut training range; close to HESTON_INDEP where possible
+PARAMS = dict(kappa=1.0, theta=0.08, xi=0.39, rho=-0.7, v0=0.04)
+r_VAL  = 0.05
 
 
 def mse(pred, ref):
@@ -65,12 +71,12 @@ print(f"  params: {ckpt['params']}")
 print("Loading hainaut_orig (parametric, original range)...")
 hainaut = HestonHainaut(device=DEVICE)
 hainaut.load(os.path.join(BASE, "results/hainaut.pt"))
-print("  Loaded. (Note: rho=-0.93 and r=0.1 are OOD for Hainaut training range)")
+print("  Loaded.")
 
 
 # ── Reference prices ──────────────────────────────────────────────────────────
 print("\nComputing GL reference prices...")
-ref = np.array([heston_call(S, K_SYN, T_SYN, r_INDEP, **HESTON_INDEP) for S in S_GRID])
+ref = np.array([heston_call(S, K_SYN, T_SYN, r_VAL, **PARAMS) for S in S_GRID])
 
 
 # ── heston_pinn inference ─────────────────────────────────────────────────────
@@ -82,31 +88,31 @@ pinn_prices = np.array([heston_pinn.price(S) for S in S_GRID])
 hainaut_prices = []
 for S in S_GRID:
     put_abs = hainaut.price(
-        S=S, V=HESTON_INDEP["v0"], t=0.0, T=T_SYN,
-        r=r_INDEP,
-        kappa=HESTON_INDEP["kappa"],
-        theta=HESTON_INDEP["theta"],
-        xi=HESTON_INDEP["xi"],
-        rho=HESTON_INDEP["rho"],
+        S=S, V=PARAMS["v0"], t=0.0, T=T_SYN,
+        r=r_VAL,
+        kappa=PARAMS["kappa"],
+        theta=PARAMS["theta"],
+        xi=PARAMS["xi"],
+        rho=PARAMS["rho"],
     )
-    call = put_abs + S - K_SYN * np.exp(-r_INDEP * T_SYN)
+    call = put_abs + S - K_SYN * np.exp(-r_VAL * T_SYN)
     hainaut_prices.append(call)
 hainaut_prices = np.array(hainaut_prices)
 
 
 # ── Results ───────────────────────────────────────────────────────────────────
-print(f"\nTest params: HESTON_INDEP  kappa={HESTON_INDEP['kappa']} xi={HESTON_INDEP['xi']} "
-      f"rho={HESTON_INDEP['rho']} r={r_INDEP}")
+print(f"\nTest params: kappa={PARAMS['kappa']} theta={PARAMS['theta']} "
+      f"xi={PARAMS['xi']} rho={PARAMS['rho']} v0={PARAMS['v0']} r={r_VAL}")
 print(f"S grid: [{S_GRID[0]:.0f}, {S_GRID[-1]:.0f}], n={len(S_GRID)}\n")
 
 print(f"{'Model':<20} {'MSE':>12} {'RelMSE':>10} {'RelMAE':>10}  Notes")
-print("-" * 75)
+print("-" * 80)
 print(f"{'heston_pinn':<20} {mse(pinn_prices, ref):>12.4e} "
       f"{relmse(pinn_prices, ref):>10.4f} "
-      f"{relmae(pinn_prices, ref):>10.4f}  in-distribution")
+      f"{relmae(pinn_prices, ref):>10.4f}  rho/r slightly OOD")
 print(f"{'hainaut_orig':<20} {mse(hainaut_prices, ref):>12.4e} "
       f"{relmse(hainaut_prices, ref):>10.4f} "
-      f"{relmae(hainaut_prices, ref):>10.4f}  rho/r OOD")
+      f"{relmae(hainaut_prices, ref):>10.4f}  in-distribution")
 
 print("\nSample prices (S, ref, heston_pinn, hainaut_call):")
 for i in [5, 15, 25, 35, 45]:
