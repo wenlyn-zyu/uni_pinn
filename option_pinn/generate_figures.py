@@ -3,8 +3,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-import matplotlib.patheffects as pe
+from matplotlib.patches import FancyBboxPatch
 import numpy as np
 import os, sys
 
@@ -87,122 +86,6 @@ def fig_soft_mask():
     ax.grid(True, alpha=0.18, linewidth=0.6)
     fig.tight_layout(pad=0.8)
     savefig(fig, "soft_mask.pdf")
-
-
-# ── 2. System Architecture ────────────────────────────────────────────────────
-def fig_architecture():
-    fig, ax = plt.subplots(figsize=(12, 7))
-    W, H = 12, 7
-    ax.set_xlim(0, W)
-    ax.set_ylim(0, H)
-    ax.axis("off")
-
-    PURPLE = "#6A1B9A"
-    LBLUE  = "#E3F2FD"
-    LGREEN = "#E8F5E9"
-    LRED   = "#FCE4EC"
-    LYELLOW= "#FFF8E1"
-    LGRAY  = "#F5F5F5"
-
-    def box(x, y, w, h, lines, fc=LBLUE, ec=C1, fs=9.5, bold=False,
-            style="round,pad=0.15", lw=1.8):
-        rect = FancyBboxPatch((x - w/2, y - h/2), w, h,
-                              boxstyle=style, facecolor=fc, edgecolor=ec,
-                              linewidth=lw, zorder=2)
-        ax.add_patch(rect)
-        txt = "\n".join(lines)
-        ax.text(x, y, txt, ha="center", va="center", fontsize=fs,
-                fontweight="bold" if bold else "normal",
-                linespacing=1.5, zorder=3)
-
-    def dashed_rect(x, y, w, h, ec="#888888", label=""):
-        rect = FancyBboxPatch((x - w/2, y - h/2), w, h,
-                              boxstyle="round,pad=0.1",
-                              facecolor="#FAFAFA", edgecolor=ec,
-                              linewidth=1.2, linestyle="--", zorder=1)
-        ax.add_patch(rect)
-        if label:
-            ax.text(x - w/2 + 0.15, y + h/2 - 0.18, label,
-                    fontsize=7.5, color=ec, va="top", zorder=3)
-
-    def arr(x1, y1, x2, y2, col="#444444", lw=1.8, label="", lfs=8):
-        ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                    arrowprops=dict(arrowstyle="-|>", color=col,
-                                   lw=lw, mutation_scale=15), zorder=4)
-        if label:
-            mx, my = (x1+x2)/2, (y1+y2)/2
-            ax.text(mx+0.08, my, label, fontsize=lfs, color=col, va="center")
-
-    # ── Layer 1: Interaction (top) ──────────────────────────────────────────
-    Y1 = 6.0
-    box(1.6,  Y1, 2.4, 0.72,
-        ["Natural Language Input", "(Chinese / English)"],
-        fc="#F3E5F5", ec=PURPLE, fs=9)
-    box(5.0,  Y1, 3.2, 0.72,
-        ["LLM Router", "param extraction  +  model selection"],
-        fc=LYELLOW, ec=C4, fs=9, bold=True)
-    box(9.2,  Y1, 2.8, 0.72,
-        ["Structured JSON",
-         r"$\{$model, $S$, $K$, $T$, $r$, $\boldsymbol{\lambda}\}$"],
-        fc=LGREEN, ec=C3, fs=9)
-
-    arr(2.8,  Y1, 3.4,  Y1, col="#555555")
-    arr(6.6,  Y1, 7.8,  Y1, col="#555555")
-
-    # ── Layer 2: PINN Solver (middle) ───────────────────────────────────────
-    Y2 = 3.8
-    # outer PINN box
-    dashed_rect(5.5, Y2, 7.6, 2.2, ec=C1, label="Unified PINN Solver")
-
-    # inner: soft mask
-    box(3.5, Y2+0.35, 2.2, 0.72,
-        ["Soft Mask",
-         r"$\mathrm{mask}=\tanh^2(\xi/0.05)$"],
-        fc="#E8EAF6", ec="#3949AB", fs=8.5)
-
-    # inner: additive parameterization
-    box(6.2, Y2+0.35, 2.8, 0.72,
-        ["Additive Output",
-         r"$\hat{V}=V_{\rm BS}(\sigma_{\rm eff})+K\cdot\mathrm{Net}(\mathbf{x})$"],
-        fc=LBLUE, ec=C1, fs=8.5)
-
-    # inner: unified PDE
-    box(5.5, Y2-0.55, 5.2, 0.62,
-        [r"Unified PDE: BSM $(\xi{=}0)$ $\to$ CEV $\to$ Heston $(\xi{\uparrow})$"],
-        fc="#E0F7FA", ec="#00838F", fs=8.5)
-
-    arr(4.6, Y2+0.35, 4.8, Y2+0.35, col="#3949AB")   # mask → additive
-    arr(5.5, Y2-0.0,  5.5, Y2-0.24, col="#00838F")    # additive → PDE
-
-    # Data anchors (right, training-time only)
-    box(10.6, Y2, 2.0, 1.5,
-        ["Data Anchors", "(training only)",
-         "BSM: analytic", "CEV: Schroder", "Heston: GL"],
-        fc=LRED, ec=C2, fs=8.2)
-    arr(9.6, Y2, 9.3, Y2, col=C2, lw=1.4, label="supervise")
-
-    # arrow: JSON → PINN
-    arr(9.2, Y1-0.36, 7.5, Y2+1.1+0.11, col="#555555")
-
-    # ── Layer 3: Output (bottom) ────────────────────────────────────────────
-    Y3 = 1.55
-    box(5.5, Y3, 5.0, 0.72,
-        ["Option Price  +  Greeks  (Delta, Gamma, Vega, ...)"],
-        fc=LGREEN, ec=C3, fs=9.5, bold=True)
-
-    arr(5.5, Y2-1.1, 5.5, Y3+0.36, col=C1, lw=2.0)
-
-    # ── Layer labels (left margin) ──────────────────────────────────────────
-    for ytxt, lbl, col in [
-        (Y1,   "Interaction", PURPLE),
-        (Y2,   "Solver",      C1),
-        (Y3,   "Output",      C3),
-    ]:
-        ax.text(0.12, ytxt, lbl, fontsize=8, color=col, va="center",
-                rotation=90, ha="center")
-
-    fig.tight_layout(pad=0.4)
-    savefig(fig, "architecture.pdf")
 
 
 # ── 3. Training Loss ──────────────────────────────────────────────────────────
@@ -396,7 +279,6 @@ def fig_eval_compare():
 if __name__ == "__main__":
     print("Generating thesis figures...")
     fig_soft_mask()
-    fig_architecture()
     fig_training_loss()
     fig_price_curves()
     fig_eval_compare()

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified PINN — Three-Layer Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,500;0,600;0,700;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --purple: #7B1FA2;  --purple-bg: #F3E5F5;
+    --orange: #E65100;  --yellow-bg: #FFF8E1;
+    --green:  #2E7D32;  --green-bg:  #E8F5E9;
+    --blue:   #1565C0;  --blue-bg:   #E3F2FD;
+    --cyan:   #00838F;  --cyan-bg:   #E0F7FA;
+    --red:    #C62828;  --red-bg:    #FCE4EC;
+    --indigo: #3949AB;  --indigo-bg: #E8EAF6;
+    --gray:   #555555;
+    --white:  #FFFFFF;
+    --bg:     #FAFBFC;
+    --text:   #1a1a1a;
+    --text-dim: #6b6b6b;
+    --layer1-bg: #F8F0FF;
+    --layer2-bg: #EEF2FF;
+    --layer3-bg: #F0FFF4;
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.05);
+    --shadow-md: 0 2px 10px rgba(0,0,0,0.07);
+    --font-display: 'Crimson Pro', 'Times New Roman', serif;
+    --font-body: 'DM Sans', 'Segoe UI', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--font-body);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Diagram Container ─────────────────────────────────────────── */
+  .diagram {
+    position: relative;
+    width: 1150px;
+    height: 710px;
+    background: var(--white);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.07);
+    overflow: hidden;
+  }
+
+  /* ── Layer Containers ──────────────────────────────────────────── */
+  .layer-box {
+    position: absolute;
+    border-radius: 10px;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .layer-box.l1 {
+    left: 22px; top: 20px; width: 1106px; height: 150px;
+    border: 1.5px solid var(--purple);
+    background: var(--layer1-bg);
+  }
+  .layer-box.l3 {
+    left: 22px; top: 550px; width: 1106px; height: 140px;
+    border: 1.5px solid var(--green);
+    background: var(--layer3-bg);
+  }
+  .layer-box .layer-label {
+    position: absolute;
+    top: -11px; left: 18px;
+    background: var(--white);
+    padding: 0 10px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .layer-box.l1 .layer-label { color: var(--purple); }
+  .layer-box.l3 .layer-label { color: var(--green);  }
+
+  /* ── Solver Container ──────────────────────────────────────────── */
+  .solver-box {
+    position: absolute;
+    left: 330px; top: 190px;
+    width: 798px; height: 340px;
+    border: 1.5px solid var(--blue);
+    border-radius: 10px;
+    z-index: 2;
+    pointer-events: none;
+    background: var(--layer2-bg);
+  }
+  .solver-box .solver-label {
+    position: absolute;
+    top: -12px; left: 20px;
+    background: var(--white);
+    padding: 0 10px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--blue);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Cards ──────────────────────────────────────────────────────── */
+  .card {
+    position: absolute;
+    border-radius: 8px;
+    padding: 11px 15px;
+    z-index: 4;
+    background: var(--white);
+    border: 1.2px solid;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+  }
+  .card:hover { box-shadow: var(--shadow-md); z-index: 10; }
+  .card .card-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+  }
+  .card .card-sub {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-dim);
+    line-height: 1.45;
+    margin-top: 4px;
+  }
+  .card .card-sub i,
+  .card .card-sub em {
+    font-style: italic;
+    color: #444;
+  }
+
+  /* ── Card color themes ──────────────────────────────────────────── */
+  .card.n1 { border-color: var(--purple); }
+  .card.n1 .card-title { color: var(--purple); }
+  .card.n2 { border-color: var(--orange); }
+  .card.n2 .card-title { color: var(--orange); }
+  .card.n3 { border-color: var(--green);  }
+  .card.n3 .card-title { color: var(--green);  }
+  .card.n4 { border-color: var(--indigo); }
+  .card.n4 .card-title { color: var(--indigo); }
+  .card.n5 { border-color: var(--blue);   }
+  .card.n5 .card-title { color: var(--blue);   }
+  .card.n6 { border-color: var(--cyan);   }
+  .card.n6 .card-title { color: var(--cyan);   }
+  .card.n7 { border-color: var(--red); }
+  .card.n7 .card-title { color: var(--red);    }
+  .card.n8 { border-color: var(--green);  }
+  .card.n8 .card-title { color: var(--green);  }
+
+  /* accent bars — solver-internal cards */
+  .card.n4, .card.n5, .card.n6 {
+    border-left: 3.5px solid;
+    padding-left: 12px;
+    border-top: 1.2px solid;
+    border-right: 1.2px solid;
+    border-bottom: 1.2px solid;
+  }
+  .card.n4 { border-left-color: var(--indigo); border-top-color: #d0d0d0; border-right-color: #d0d0d0; border-bottom-color: #d0d0d0; }
+  .card.n5 { border-left-color: var(--blue);   border-top-color: #d0d0d0; border-right-color: #d0d0d0; border-bottom-color: #d0d0d0; }
+  .card.n6 { border-left-color: var(--cyan);   border-top-color: #d0d0d0; border-right-color: #d0d0d0; border-bottom-color: #d0d0d0; }
+
+  /* ── Card positions ─────────────────────────────────────────────── */
+  .card.n1 { left: 48px;  top: 57px;  width: 210px; height: 72px; }
+  .card.n2 { left: 340px; top: 57px;  width: 320px; height: 72px; }
+  .card.n3 { left: 740px; top: 57px;  width: 270px; height: 72px; }
+  .card.n4 { left: 375px; top: 410px; width: 200px; height: 68px; }
+  .card.n5 { left: 630px; top: 410px; width: 300px; height: 68px; }
+  .card.n6 { left: 570px; top: 296px; width: 420px; height: 58px; }
+  .card.n7 { left:  48px; top: 260px; width: 180px; height: 195px; }
+  .card.n8 { left: 485px; top: 599px; width: 490px; height: 70px; }
+
+  /* ── Timing Badge ──────────────────────────────────────────────── */
+  .badge {
+    position: absolute;
+    left: 991px; top: 618px;
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--gray);
+    padding: 5px 11px;
+    border-radius: 18px;
+    background: #F5F5F5;
+    border: 1px solid #E0E0E0;
+    z-index: 5;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── SVG Overlay ────────────────────────────────────────────────── */
+  .svg-overlay {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* ── Edge Legend ────────────────────────────────────────────────── */
+  .legend {
+    position: absolute;
+    left: 48px; top: 574px;
+    z-index: 8;
+    background: rgba(255,255,255,0.94);
+    border-radius: 8px;
+    padding: 11px 14px;
+    box-shadow: var(--shadow-sm);
+    font-family: var(--font-body);
+    font-size: 10px;
+    border: 1px solid #ECECEC;
+  }
+  .legend .legend-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--gray);
+    margin-bottom: 7px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    color: #444;
+  }
+  .legend-line {
+    width: 26px;
+    flex-shrink: 0;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="diagram">
+
+  <!-- Layer 1 — Interaction Container -->
+  <div class="layer-box l1">
+    <span class="layer-label">Interaction</span>
+  </div>
+
+  <!-- Layer 2 — Solver Container -->
+  <div class="solver-box">
+    <span class="solver-label">Unified PINN Solver</span>
+  </div>
+
+  <!-- Layer 3 — Output Container -->
+  <div class="layer-box l3">
+    <span class="layer-label">Output</span>
+  </div>
+
+  <!-- Layer 1 — Interaction -->
+  <div class="card n1">
+    <span class="card-title">User Input</span>
+    <span class="card-sub">(CN / EN)</span>
+  </div>
+  <div class="card n2">
+    <span class="card-title">LLM Router</span>
+    <span class="card-sub">param extraction &amp; model selection</span>
+  </div>
+  <div class="card n3">
+    <span class="card-title">Structured JSON</span>
+    <span class="card-sub">{&nbsp;model,&nbsp;S,&nbsp;K,&nbsp;T,&nbsp;r,&nbsp;λ&nbsp;}</span>
+  </div>
+
+  <!-- Layer 2 — Solver -->
+  <div class="card n7">
+    <span class="card-title">Data Anchors</span>
+    <span class="card-sub">train only<br>BSM&nbsp;:&nbsp;analytic<br>CEV&nbsp;:&nbsp;Schroder<br>Heston&nbsp;:&nbsp;GL</span>
+  </div>
+  <div class="card n4">
+    <span class="card-title">Soft Mask</span>
+    <span class="card-sub">mask = tanh<sup>2</sup>(<i>ξ</i> / 0.05)</span>
+  </div>
+  <div class="card n5">
+    <span class="card-title">Additive Output</span>
+    <span class="card-sub"><i>V̂</i> = <i>V</i><sub>BS</sub>(<i>σ</i><sub>eff</sub>) + <i>K</i> · Net(<i>x</i>)</span>
+  </div>
+  <div class="card n6">
+    <span class="card-title">Unified PDE</span>
+    <span class="card-sub"><i>ξ</i>&nbsp;=&nbsp;0&nbsp;:&nbsp;BSM&nbsp;/&nbsp;CEV &nbsp;&nbsp;|&nbsp;&nbsp; <i>ξ</i>&nbsp;&gt;&nbsp;0&nbsp;:&nbsp;Heston</span>
+  </div>
+
+  <!-- Layer 3 — Output -->
+  <div class="card n8">
+    <span class="card-title">Option Price + Greeks</span>
+    <span class="card-sub">Delta &nbsp;·&nbsp; Gamma &nbsp;·&nbsp; Vega &nbsp;·&nbsp; …</span>
+  </div>
+
+  <!-- Timing Badge -->
+  <div class="badge">~2 ms / query</div>
+
+  <!-- Edge Legend -->
+  <div class="legend">
+    <div class="legend-title">Edge Types</div>
+    <div class="legend-item">
+      <svg class="legend-line" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="#555" stroke-width="1.6" marker-end="url(#legend-arrow-gray)"/></svg>
+      <span>Data Flow</span>
+    </div>
+    <div class="legend-item">
+      <svg class="legend-line" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="#3949AB" stroke-width="1.6" marker-end="url(#legend-arrow-indigo)"/></svg>
+      <span>Computational Dependency</span>
+    </div>
+    <div class="legend-item">
+      <svg class="legend-line" height="10"><line x1="0" y1="5" x2="26" y2="5" stroke="#C62828" stroke-width="1.6" stroke-dasharray="7 4" marker-end="url(#legend-arrow-red)"/></svg>
+      <span>Training Supervision</span>
+    </div>
+  </div>
+
+  <!-- SVG Arrow Overlay -->
+  <svg class="svg-overlay" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow-gray"   markerWidth="8" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 8 3.5, 0 7" fill="#555555"/>
+      </marker>
+      <marker id="arrow-indigo" markerWidth="8" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 8 3.5, 0 7" fill="#3949AB"/>
+      </marker>
+      <marker id="arrow-cyan"   markerWidth="8" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 8 3.5, 0 7" fill="#00838F"/>
+      </marker>
+      <marker id="arrow-red"    markerWidth="8" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 8 3.5, 0 7" fill="#C62828"/>
+      </marker>
+      <marker id="arrow-blue"   markerWidth="8" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 8 3.5, 0 7" fill="#1565C0"/>
+      </marker>
+      <!-- Legend mini markers -->
+      <marker id="legend-arrow-gray"   markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+        <polygon points="0 0, 6 2.5, 0 5" fill="#555555"/>
+      </marker>
+      <marker id="legend-arrow-indigo" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+        <polygon points="0 0, 6 2.5, 0 5" fill="#3949AB"/>
+      </marker>
+      <marker id="legend-arrow-cyan"   markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+        <polygon points="0 0, 6 2.5, 0 5" fill="#00838F"/>
+      </marker>
+      <marker id="legend-arrow-red"    markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+        <polygon points="0 0, 6 2.5, 0 5" fill="#C62828"/>
+      </marker>
+    </defs>
+
+    <!-- E1: N1 → N2 — Data Flow -->
+    <line x1="258" y1="93" x2="340" y2="93"
+          stroke="#555555" stroke-width="1.6" marker-end="url(#arrow-gray)"/>
+
+    <!-- E2: N2 → N3 — Data Flow -->
+    <line x1="660" y1="93" x2="740" y2="93"
+          stroke="#555555" stroke-width="1.6" marker-end="url(#arrow-gray)"/>
+
+    <!-- E3: N3 → Solver — Data Flow, straight down to solver top edge -->
+    <line x1="875" y1="129" x2="875" y2="190"
+          stroke="#555555" stroke-width="1.6" marker-end="url(#arrow-gray)"/>
+
+    <!-- E4: N4 → N5 — Computational Dependency -->
+    <line x1="575" y1="444" x2="630" y2="444"
+          stroke="#3949AB" stroke-width="1.6" marker-end="url(#arrow-indigo)"/>
+
+    <!-- E5: N6 → N5 — Computational Dependency, vertical down, centers aligned -->
+    <line x1="780" y1="354" x2="780" y2="410"
+          stroke="#3949AB" stroke-width="1.6" marker-end="url(#arrow-indigo)"/>
+
+    <!-- E6: N7 → Solver — Training Supervision, dashed -->
+    <line x1="228" y1="357" x2="330" y2="357"
+          stroke="#C62828" stroke-width="1.6" stroke-dasharray="8 5"
+          marker-end="url(#arrow-red)"/>
+
+    <!-- E7: Solver → N8 — Data Flow, vertical down -->
+    <line x1="730" y1="530" x2="730" y2="599"
+          stroke="#1565C0" stroke-width="2.2" marker-end="url(#arrow-blue)"/>
+
+    <!-- Edge Label -->
+    <text x="279" y="348" fill="#C62828" font-family="'DM Sans', sans-serif"
+          font-size="19" font-weight="600" text-anchor="middle">supervise</text>
+  </svg>
+
+</div>
+
+
+</body>
+</html>
