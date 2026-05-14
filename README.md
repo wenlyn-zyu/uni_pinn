@@ -14,10 +14,13 @@ Key dependencies: PyTorch, NumPy, SciPy, pandas, requests (for LLM API).
 
 ```
 uni_pinn/
+├── README.md
 ├── option_pinn/
 │   ├── unified_pinn_v2.py          # Unified PINN model (v16)
 │   ├── ref_solvers.py              # Reference pricers (BSM/CEV/Heston analytical)
-│   ├── eval_all.py                 # Main evaluation script
+│   ├── eval_all.py                 # Synthetic and market evaluation
+│   ├── llm_test.py                 # LLM routing layer test (20 cases)
+│   ├── ablation.py                 # Ablation study (3 variants)
 │   ├── greeks_validation.py        # Greeks computation and validation
 │   ├── generate_figures.py         # Thesis figures
 │   ├── llm_router.py               # LLM routing layer (DeepSeek API)
@@ -28,7 +31,7 @@ uni_pinn/
 │   │   └── train_independent.py    # Train BSM/CEV baselines
 │   ├── data/
 │   │   └── spy_quotedata.csv       # SPY options chain (2026-05-11, S=739.75)
-│   └── results/                    # Evaluation outputs (CSV)
+│   └── results/                    # Evaluation outputs (CSV, model weights .pt)
 └── thesis/                         # LaTeX source
 ```
 
@@ -68,17 +71,32 @@ python eval_all.py --mode market
 python eval_all.py --mode all
 ```
 
-Outputs written to `results/eval_synthetic.csv` and `results/eval_market.csv`. These CSV files are the authoritative source for all numerical results in the thesis.
+Outputs written to `results/eval_synthetic.csv` and `results/eval_market.csv`.
 
-### Step 4 — Greeks validation
+### Step 4 — LLM routing layer test (20 test cases)
+
+```bash
+export DEEPSEEK_API_KEY=your_key_here   # or set in llm_router.py
+python llm_test.py --save results/llm_test_results.json
+```
+
+Runs 20 test cases (10 Chinese + 10 English, covering BSM/CEV/Heston) and reports model selection accuracy. Expected result: 20/20 (100%).
+
+### Step 5 — Ablation study
+
+```bash
+python ablation.py --epochs 30000 --save results/ablation_results.json
+```
+
+Trains three ablation variants (no soft mask / no additive parameterization / no data anchor) and reports BSM and Heston MAE for each. Takes ~90 min on a single GPU (3 × 30,000 steps).
+
+### Step 6 — Greeks validation
 
 ```bash
 python greeks_validation.py
 ```
 
-Computes Delta, Gamma, Vega via automatic differentiation and compares against analytical (BSM) or finite-difference (Heston) reference values.
-
-### Step 5 — Generate thesis figures
+### Step 7 — Generate thesis figures
 
 ```bash
 python generate_figures.py
