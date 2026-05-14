@@ -34,15 +34,21 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # Example: AAPL230616C00150000 → AAPL call expiring 2023-06-16 strike $150.000
 
 _OCC_RE = re.compile(
-    r"^([A-Za-z]{1,6})"          # ticker (1-6 letters)
+    r"([A-Za-z]{1,6})"           # ticker (1-6 letters)
     r"(\d{2})(\d{2})(\d{2})"     # YY MM DD
     r"([CP])"                     # Call / Put
-    r"(\d{8})$"                   # strike × 1000, zero-padded
+    r"(\d{8})"                    # strike × 1000, zero-padded
 )
 
+def _find_occ_in_text(text: str) -> str | None:
+    """Return the first OCC symbol found in *text*, or None."""
+    m = _OCC_RE.search(text.strip())
+    return m.group(0) if m else None
+
+
 def is_occ_symbol(text: str) -> bool:
-    """Check whether *text* looks like a standalone OCC option symbol."""
-    return bool(_OCC_RE.match(text.strip()))
+    """Check whether *text* looks like or contains an OCC option symbol."""
+    return _find_occ_in_text(text) is not None
 
 
 def decode_occ_symbol(occ: str) -> dict:
@@ -258,12 +264,15 @@ class LLMRouter:
         to guarantee correctness.
         Raises ValueError on JSON parse failure after retry.
         """
-        # Preprocess: detect OCC symbol
+        # Preprocess: detect OCC symbol (may be embedded in longer text)
         user_text = user_input.strip()
         occ_decoded = None
-        if is_occ_symbol(user_text):
-            occ_decoded = decode_occ_symbol(user_text)
-            user_text = _format_occ_for_llm(user_text)
+        occ_symbol = _find_occ_in_text(user_text)
+        if occ_symbol:
+            occ_decoded = decode_occ_symbol(occ_symbol)
+            extra = user_text.replace(occ_symbol, "").strip()
+            occ_prompt = _format_occ_for_llm(occ_symbol)
+            user_text = f"{occ_prompt}\nAdditional user input: {extra}" if extra else occ_prompt
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
