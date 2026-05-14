@@ -94,8 +94,10 @@ Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定�
     BSM-PINN & 解析解 & 0.016 & 0.6\% & $\sigma=0.20$ \\
     CEV-PINN & Schroder解析解 & 0.074 & 1.69\%$^\dagger$ & $\sigma=0.20$，$\beta=0.5$ \\
     Hainaut \& Casas (2024) & GL半解析解 & --- & 9.169\%$^\ddagger$ &
-      $\kappa\in[0.5,2.0]$，$\theta\in[0.062,0.42]$；
-      $\xi\in[0.1,0.9]$，$\rho\in[-0.8,0.8]$ \\
+      \begin{tabular}[t]{@{}l@{}}
+        $\kappa\in[0.5,2.0]$，$\theta\in[0.062,0.42]$ \\
+        $\xi\in[0.1,0.9]$，$\rho\in[-0.8,0.8]$
+      \end{tabular} \\
     \hline
   \end{tabular}
 
@@ -104,7 +106,7 @@ Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定�
   $^\ddagger$经put-call parity转换为CALL价格，仅统计$S/K\geq 0.85$区域。}
 \end{table}
 
-上述三个独立PINN验证了各模型PDE的可解性，并为后续统一框架提供了精度基准。
+上述三个独立PINN验证了各模型PDE的可解性，并为后续多模型方法提供了精度基准。
 
 \section{大语言模型辅助科学计算}\label{sec:llm_sci}
 
