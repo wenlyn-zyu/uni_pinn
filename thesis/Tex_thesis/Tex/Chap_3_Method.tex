@@ -3,7 +3,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
-  \caption{多模型期权定价系统架构（三层结构）。顶层（交互层）：用户以自然语言输入期权需求，LLM路由层完成参数提取与模型选择，输出结构化JSON；中层（求解层）：统一PINN求解器包含软掩码子模块（$\mathrm{mask}=\tanh^2(\xi/0.05)$，实现BSM/CEV与Heston之间的连续插值）和加法参数化子模块（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$），数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号；底层（输出层）：一次前向传播（$\sim$2ms）输出期权价格及Greeks。}
+  \caption{多模型期权定价系统三层架构。交互层：用户以自然语言输入期权需求，LLM路由层提取参数并选择模型，输出结构化JSON。求解层：统一PINN求解器通过软掩码（$\mathrm{mask}=\tanh^2(\xi/0.05)$）和加法参数化（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$）统一三大模型PDE，训练时以解析解/半解析解作为数据锚点。输出层：单次前向传播（$\sim$2\,ms）返回期权价格及Greeks。}
   \label{fig:architecture}
 \end{figure}
 
@@ -65,7 +65,7 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.75\textwidth]{Img/soft_mask.pdf}
-  \caption{软掩码函数$\text{mask}=\tanh^2(\xi/0.05)$。当$\xi\to 0$时，$\text{mask}\to 0$，扩散系数退化为$\sigma^2 S^{2\beta}$（BSM/CEV）；当$\xi=0.3$时，$\text{mask}\approx 0.998$，扩散系数近似为$vS^2$（Heston）。函数在$\xi\in[0,0.5]$区间内平滑过渡，避免了硬切换带来的梯度不连续问题。}
+  \caption{软掩码函数$\mathrm{mask}=\tanh^2(\xi/0.05)$随vol-of-vol参数$\xi$的变化。$\xi\to 0$时mask趋近于0，扩散系数退化为BSM/CEV形式；$\xi=0.3$时mask$\approx 0.998$，对应Heston随机波动率结构。函数在$[0,0.5]$区间内单调平滑过渡，避免硬切换引起的梯度不连续。}
   \label{fig:soft_mask}
 \end{figure}
 

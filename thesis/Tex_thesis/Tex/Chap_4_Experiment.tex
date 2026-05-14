@@ -80,7 +80,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
-  \caption{统一PINN（v16）训练损失曲线（共30000轮，54个参数变体）。总损失从初始约$0.5$持续下降；PDE残差损失（$\mathcal{L}_\text{pde}$）主导总损失；边界条件损失（$\mathcal{L}_\text{bc}$）和数据锚点损失（$\mathcal{L}_\text{data}$）在训练早期快速下降至$10^{-5}$量级。余弦退火学习率调度使损失在后期持续缓慢下降。}
+  \caption{统一PINN（v16）训练损失曲线（30000步，54个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
   \label{fig:training_loss}
 \end{figure}
 
@@ -116,7 +116,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/price_curves.pdf}
-  \caption{三大模型期权价格曲线对比（$t=0$，$S\in[50,250]$）。实线为参考解，虚线为统一PINN预测。左：BSM；中：CEV（$\beta=0.5$）；右：Heston。}
+  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。三种模型的预测曲线与参考解高度吻合。}
   \label{fig:price_curves}
 \end{figure}
 
@@ -129,7 +129,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/error_dist.pdf}
-  \caption{三大模型绝对误差分布（$t=0$，$S\in[50,250]$）。误差主要集中在深度虚值（$S<70$）和深度实值（$S>140$）区域，ATM区域（$S\in[80,120]$）误差最小。}
+  \caption{三大模型绝对误差分布（$t=0$，$S\in[50,250]$）。绿色阴影区域为ATM区间（$S\in[80,120]$），该区域误差最小；深度虚值（$S<70$）和深度实值（$S>140$）区域误差相对较大。}
   \label{fig:error_dist}
 \end{figure}
 
@@ -313,7 +313,7 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/eval_compare.pdf}
-  \caption{独立PINN与统一PINN价格曲线对比。实线为参考解，虚线为独立PINN，点线为统一PINN。}
+  \caption{独立PINN与统一PINN价格曲线对比（$t=0$，$S\in[50,250]$）。实线为参考解，虚线为统一PINN，点线为独立PINN；竖虚线标记平值点。}
   \label{fig:compare}
 \end{figure}
 
