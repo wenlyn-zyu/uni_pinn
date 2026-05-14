@@ -6,13 +6,13 @@
 
 传统数值方法（有限差分、有限元）在求解高维PDE时面临维数灾难：网格点数随维度指数增长，Heston这样的二维模型已需要大量计算资源，而更高维的随机波动率模型几乎无法实时求解。此外，传统工具要求用户手动指定模型类型和参数，对非专业用户门槛较高。
 
-物理信息神经网络（PINN）\cite{raissi2019physics}将PDE残差直接嵌入损失函数，无需网格剖分，训练完成后可对任意输入即时推断（单次推断约2ms）。近年来，PINN已被应用于BSM\cite{dhiman2023pinn}、CEV\cite{bae2024localvol}、Heston\cite{hainaut2024heston,guo2024icpinn}等期权定价模型。与此同时，大语言模型（LLM）在自然语言理解和结构化信息提取方面取得了突破性进展\cite{liu2025pdeagent}，为构建自然语言驱动的科学计算接口提供了基础。
+物理信息神经网络（PINN）\cite{raissi2019physics}将PDE残差直接嵌入损失函数，无需网格剖分，训练完成后可对任意输入即时推断（单次推断约2ms）。近年来，PINN已被应用于BSM\cite{dhiman2023pinn}、CEV\cite{zamxaka2023cev}、Heston\cite{hainaut2024heston,guo2024icpinn}等期权定价模型。与此同时，大语言模型（LLM）在自然语言理解和结构化信息提取方面取得了突破性进展\cite{liu2025pdeagent}，为构建自然语言驱动的科学计算接口提供了基础。
 
 \section{现有工作的局限性}\label{sec:motivation}
 
 现有PINN期权定价研究存在两方面主要不足。
 
-\textbf{模型孤立。}现有工作（Dhiman等\cite{dhiman2023pinn}、Bae等\cite{bae2024localvol}、Hainaut等\cite{hainaut2024heston}）均针对单一模型分别训练独立的PINN，三个模型之间无法共享网络权重，当需要同时支持多种模型时，必须维护多套独立的训练流程和模型文件。
+\textbf{模型孤立。}现有工作（Dhiman等\cite{dhiman2023pinn}、Hainaut等\cite{hainaut2024heston}）均针对单一模型分别训练独立的PINN，三个模型之间无法共享网络权重，当需要同时支持多种模型时，必须维护多套独立的训练流程和模型文件。
 
 \textbf{交互门槛高。}现有PINN工具要求用户手动指定模型类型和所有数值参数。选择合适的定价模型本身需要量化金融背景，普通用户难以判断在当前市场条件下应使用BSM、CEV还是Heston。
 

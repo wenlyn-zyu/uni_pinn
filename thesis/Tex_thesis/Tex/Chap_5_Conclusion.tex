@@ -4,7 +4,7 @@
 
 本文的工作与现有PINN期权定价研究的主要区别体现在以下几个维度。
 
-在多模型统一性方面，现有工作（Dhiman等\cite{dhiman2023pinn}、Bae等\cite{bae2024localvol}、Hainaut等\cite{hainaut2024heston}）均针对单一模型，本文是首个将BSM、CEV、Heston三大模型统一在单一网络中的工作。多模型联合训练带来了互相增益：BSM/CEV的简单结构为Heston提供了良好的初始化，有助于克服Heston二维PDE的收敛困难。与参数化PINN相比，统一PINN在BSM和CEV上精度更高，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率，说明软掩码和加法参数化实现了更高效的归纳偏置。
+在多模型统一性方面，现有工作（Dhiman等\cite{dhiman2023pinn}、Hainaut等\cite{hainaut2024heston}）均针对单一模型，本文是首个将BSM、CEV、Heston三大模型统一在单一网络中的工作。多模型联合训练带来了互相增益：BSM/CEV的简单结构为Heston提供了良好的初始化，有助于克服Heston二维PDE的收敛困难。与参数化PINN相比，统一PINN在BSM和CEV上精度更高，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率，说明软掩码和加法参数化实现了更高效的归纳偏置。
 
 在交互方式方面，现有PINN工具均为纯数值接口，用户需手动指定模型类型和参数。本文引入LLM路由层，支持自然语言输入，是PINN与LLM结合用于期权定价的首次尝试。与PDE-AGENT\cite{liu2025pdeagent}相比，本文的LLM仅作为路由层，不参与求解过程，因此延迟更低、可靠性更高。
 
