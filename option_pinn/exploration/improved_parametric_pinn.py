@@ -485,15 +485,15 @@ class ImprovedParametricPINN:
               w_data: float = 500.0, w_bsm_raw: float = 5.0,
               log_every: int = 500,
               save_every: int = 0, save_path: str = None):
-        from tqdm import tqdm
+        import time
 
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             self.optimizer, T_0=20000, T_mult=2, eta_min=1e-6
         )
         history = []
-        pbar = tqdm(range(1, epochs + 1), desc="ImpParamPINN", dynamic_ncols=True)
+        t0 = time.time()
 
-        for epoch in pbar:
+        for epoch in range(1, epochs + 1):
             self.optimizer.zero_grad()
 
             loss_pde     = self._pde_loss(10000)
@@ -511,6 +511,9 @@ class ImprovedParametricPINN:
             self.scheduler.step()
 
             if epoch % log_every == 0:
+                elapsed = time.time() - t0
+                it_s = epoch / elapsed if elapsed > 0 else 0
+                eta_h = (epochs - epoch) / (it_s * 3600) if it_s > 0 else 0
                 history.append({
                     "epoch": epoch,
                     "loss":  loss.item(),
@@ -519,17 +522,17 @@ class ImprovedParametricPINN:
                     "ic":    loss_ic.item(),
                     "data":  loss_data.item(),
                 })
-                pbar.set_postfix(
-                    loss=f"{loss.item():.3e}",
-                    pde=f"{loss_pde.item():.3e}",
-                    data=f"{loss_data.item():.3e}",
-                )
+                print(f"[{elapsed/60:.0f}m] epoch {epoch:5d}  loss={loss.item():.3e}  "
+                      f"pde={loss_pde.item():.3e}  data={loss_data.item():.3e}  "
+                      f"ic={loss_ic.item():.3e}  it/s={it_s:.1f}  eta={eta_h:.1f}h",
+                      flush=True)
 
             if save_every > 0 and save_path and epoch % save_every == 0:
                 ckpt_path = save_path.replace(".pt", f"_e{epoch}.pt")
                 torch.save({"state_dict": self.net.state_dict(),
                              "epoch": epoch,
                              "optimizer": self.optimizer.state_dict()}, ckpt_path)
+                print(f"  -> saved {ckpt_path}", flush=True)
 
         return history
 
