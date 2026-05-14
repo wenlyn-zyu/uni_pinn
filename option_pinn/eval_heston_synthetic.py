@@ -1,18 +1,16 @@
 """
-Synthetic data evaluation: compare Heston PINN variants against GL reference.
+Heston 合成数据精度评估，分两部分：
 
-Both models evaluated on the same params and S grid.
+Part 1 — 各自 in-distribution 精度
+  heston_pinn  : HESTON_INDEP (kappa=1.0, xi=0.39, rho=-0.93, r=0.1)
+  hainaut_orig : Hainaut 训练范围内参数 (kappa=1.15, xi=0.20, rho=-0.40, r=0.04)
+  各自与 GL 参考解对比，S 网格取各自训练范围内。
 
-Test params: kappa=1.0, theta=0.08, xi=0.39, rho=-0.7, v0=0.04, r=0.05
-  - Chosen to be within Hainaut training range AND close to HESTON_INDEP
-  - Hainaut ranges: S∈[20,180], r∈[0.01,0.07], kappa∈[0.5,2.0],
-    theta∈[0.062,0.42], xi∈[0.1,0.9], rho∈[-0.8,0.8]
-  - heston_pinn trained on rho=-0.93, r=0.1 — these test params are slightly OOD for it
-  - hainaut_orig: all params in-distribution
-
-Hainaut prices PUT at K=100; price() returns absolute put price.
-Call price via put-call parity: C = P + S - K*exp(-rT)
-S grid clipped to [50, 170] to stay within Hainaut S_RANGE=[20,180].
+Part 2 — 统一测试参数 HESTON_UNIFIED，五模型横向对比
+  HESTON_UNIFIED = kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04, r=0.05
+  模型：heston_pinn, hainaut_orig, unified_v2, parametric_pinn
+  注：hainaut theta=0.04 略低于其训练下限 0.062，其余参数均在范围内。
+  S 网格 [50, 170]（Hainaut S_RANGE=[20,180] 与 heston_pinn S_max=400 的交集）。
 """
 import sys, os
 import numpy as np
@@ -21,101 +19,135 @@ import torch
 BASE = "/home/yz2026/zhuwl2022/uni_pinn/option_pinn"
 sys.path.insert(0, BASE)
 sys.path.insert(0, os.path.join(BASE, "independent"))
+sys.path.insert(0, os.path.join(BASE, "parametric_pinn"))
 
 from ref_solvers import heston_call
 from heston_hainaut import HestonHainaut
 from heston_pinn import Heston_PINN
 
-K_SYN  = 100.0
-T_SYN  = 1.0
-# Stay within Hainaut S_RANGE=[20,180] and heston_pinn S_max=400
-S_GRID = np.linspace(50, 170, 50)
+K_SYN = 100.0
+T_SYN = 1.0
 
-# Params within Hainaut training range; close to HESTON_INDEP where possible
-PARAMS = dict(kappa=1.0, theta=0.08, xi=0.39, rho=-0.7, v0=0.04)
-r_VAL  = 0.05
+HESTON_INDEP   = dict(kappa=1.0,  theta=0.08,  xi=0.39, rho=-0.93, v0=0.04)
+r_INDEP        = 0.1
+
+HESTON_HAINAUT = dict(kappa=1.15, theta=0.202, xi=0.20, rho=-0.40, v0=0.04)
+r_HAINAUT      = 0.04
+
+HESTON_UNIFIED = dict(kappa=2.0,  theta=0.04,  xi=0.3,  rho=-0.70, v0=0.04)
+r_UNIFIED      = 0.05
 
 
 def mse(pred, ref):
     return float(np.mean((np.array(pred) - np.array(ref)) ** 2))
 
-
 def relmse(pred, ref):
     ref, pred = np.array(ref), np.array(pred)
     mask = np.abs(ref) > 0.01
-    if mask.sum() == 0:
-        return float("nan")
-    return float(np.mean(((pred[mask] - ref[mask]) / ref[mask]) ** 2))
-
+    return float(np.mean(((pred[mask] - ref[mask]) / ref[mask]) ** 2)) if mask.sum() else float("nan")
 
 def relmae(pred, ref):
     ref, pred = np.array(ref), np.array(pred)
     mask = np.abs(ref) > 0.01
-    if mask.sum() == 0:
-        return float("nan")
-    return float(np.mean(np.abs((pred[mask] - ref[mask]) / ref[mask])))
+    return float(np.mean(np.abs((pred[mask] - ref[mask]) / ref[mask]))) if mask.sum() else float("nan")
+
+def print_row(name, pred, ref, note=""):
+    print(f"  {name:<22} MSE={mse(pred,ref):10.4e}  RelMSE={relmse(pred,ref):8.4f}  RelMAE={relmae(pred,ref):8.4f}  {note}")
 
 
 # ── Load models ───────────────────────────────────────────────────────────────
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-print("Loading heston_pinn (fixed-param)...")
+print("Loading models...")
+
 ckpt = torch.load(os.path.join(BASE, "results/indep_heston.pt"), map_location=DEVICE)
 heston_pinn = Heston_PINN(**ckpt["params"], device=DEVICE)
 heston_pinn.aux_net.load_state_dict(ckpt["aux_state"])
 heston_pinn.main_net.load_state_dict(ckpt["main_state"])
-heston_pinn.aux_net.eval()
-heston_pinn.main_net.eval()
-print(f"  params: {ckpt['params']}")
+heston_pinn.aux_net.eval(); heston_pinn.main_net.eval()
 
-print("Loading hainaut_orig (parametric, original range)...")
 hainaut = HestonHainaut(device=DEVICE)
 hainaut.load(os.path.join(BASE, "results/hainaut.pt"))
-print("  Loaded.")
+
+from eval_all import load_unified, load_parametric
+unified = load_unified()
+param_pinn = load_parametric()
+
+print("All models loaded.\n")
 
 
-# ── Reference prices ──────────────────────────────────────────────────────────
-print("\nComputing GL reference prices...")
-ref = np.array([heston_call(S, K_SYN, T_SYN, r_VAL, **PARAMS) for S in S_GRID])
+def hainaut_call(S, params, r):
+    """Hainaut put -> call via put-call parity."""
+    put = hainaut.price(S=S, V=params["v0"], t=0.0, T=T_SYN, r=r,
+                        kappa=params["kappa"], theta=params["theta"],
+                        xi=params["xi"], rho=params["rho"])
+    return put + S - K_SYN * np.exp(-r * T_SYN)
 
 
-# ── heston_pinn inference ─────────────────────────────────────────────────────
-pinn_prices = np.array([heston_pinn.price(S) for S in S_GRID])
+# ══════════════════════════════════════════════════════════════════════════════
+# Part 1: 各自 in-distribution 精度
+# ══════════════════════════════════════════════════════════════════════════════
+print("=" * 70)
+print("Part 1: 各自 in-distribution 精度")
+print("=" * 70)
+
+# heston_pinn: S∈[50,250], HESTON_INDEP
+S_INDEP = np.linspace(50, 250, 50)
+ref_indep  = np.array([heston_call(S, K_SYN, T_SYN, r_INDEP, **HESTON_INDEP) for S in S_INDEP])
+pred_indep = np.array([heston_pinn.price(S) for S in S_INDEP])
+print(f"\nheston_pinn  (HESTON_INDEP: kappa={HESTON_INDEP['kappa']} xi={HESTON_INDEP['xi']} rho={HESTON_INDEP['rho']} r={r_INDEP})")
+print_row("heston_pinn", pred_indep, ref_indep, "in-distribution")
+
+# hainaut_orig: S∈[30,170], Hainaut 训练范围内参数
+S_HAINAUT = np.linspace(30, 170, 50)
+ref_hainaut  = np.array([heston_call(S, K_SYN, T_SYN, r_HAINAUT, **HESTON_HAINAUT) for S in S_HAINAUT])
+pred_hainaut = np.array([hainaut_call(S, HESTON_HAINAUT, r_HAINAUT) for S in S_HAINAUT])
+print(f"\nhainaut_orig (kappa={HESTON_HAINAUT['kappa']} xi={HESTON_HAINAUT['xi']} rho={HESTON_HAINAUT['rho']} r={r_HAINAUT})")
+print_row("hainaut_orig", pred_hainaut, ref_hainaut, "in-distribution")
 
 
-# ── hainaut inference ─────────────────────────────────────────────────────────
-# price() returns absolute put price; convert to call via put-call parity
-hainaut_prices = []
-for S in S_GRID:
-    put_abs = hainaut.price(
-        S=S, V=PARAMS["v0"], t=0.0, T=T_SYN,
-        r=r_VAL,
-        kappa=PARAMS["kappa"],
-        theta=PARAMS["theta"],
-        xi=PARAMS["xi"],
-        rho=PARAMS["rho"],
-    )
-    call = put_abs + S - K_SYN * np.exp(-r_VAL * T_SYN)
-    hainaut_prices.append(call)
-hainaut_prices = np.array(hainaut_prices)
+# ══════════════════════════════════════════════════════════════════════════════
+# Part 2: 统一测试参数 HESTON_UNIFIED，五模型横向对比
+# ══════════════════════════════════════════════════════════════════════════════
+print("\n" + "=" * 70)
+print("Part 2: HESTON_UNIFIED 统一测试参数，五模型横向对比")
+print(f"  kappa={HESTON_UNIFIED['kappa']} theta={HESTON_UNIFIED['theta']} "
+      f"xi={HESTON_UNIFIED['xi']} rho={HESTON_UNIFIED['rho']} v0={HESTON_UNIFIED['v0']} r={r_UNIFIED}")
+print("=" * 70)
 
+S_UNIFIED = np.linspace(50, 170, 50)
+ref_u = np.array([heston_call(S, K_SYN, T_SYN, r_UNIFIED, **HESTON_UNIFIED) for S in S_UNIFIED])
 
-# ── Results ───────────────────────────────────────────────────────────────────
-print(f"\nTest params: kappa={PARAMS['kappa']} theta={PARAMS['theta']} "
-      f"xi={PARAMS['xi']} rho={PARAMS['rho']} v0={PARAMS['v0']} r={r_VAL}")
-print(f"S grid: [{S_GRID[0]:.0f}, {S_GRID[-1]:.0f}], n={len(S_GRID)}\n")
+# heston_pinn (OOD: trained on different params)
+pred_pinn_u = np.array([heston_pinn.price(S) for S in S_UNIFIED])
 
-print(f"{'Model':<20} {'MSE':>12} {'RelMSE':>10} {'RelMAE':>10}  Notes")
-print("-" * 80)
-print(f"{'heston_pinn':<20} {mse(pinn_prices, ref):>12.4e} "
-      f"{relmse(pinn_prices, ref):>10.4f} "
-      f"{relmae(pinn_prices, ref):>10.4f}  rho/r slightly OOD")
-print(f"{'hainaut_orig':<20} {mse(hainaut_prices, ref):>12.4e} "
-      f"{relmse(hainaut_prices, ref):>10.4f} "
-      f"{relmae(hainaut_prices, ref):>10.4f}  in-distribution")
+# hainaut_orig (theta=0.04 略低于训练下限 0.062，其余 in-distribution)
+pred_hainaut_u = np.array([hainaut_call(S, HESTON_UNIFIED, r_UNIFIED) for S in S_UNIFIED])
 
-print("\nSample prices (S, ref, heston_pinn, hainaut_call):")
+# unified_v2
+from unified_pinn_v2 import ModelParams
+p_u = ModelParams.from_heston(K=K_SYN, T=T_SYN, r=r_UNIFIED, **HESTON_UNIFIED)
+pred_unified_u = np.array([unified.price(p_u, S) for S in S_UNIFIED])
+
+# parametric_pinn
+pred_param_u = np.array([
+    param_pinn.price(S=S, K=K_SYN, T=T_SYN, r=r_UNIFIED,
+                     kappa=HESTON_UNIFIED["kappa"], theta=HESTON_UNIFIED["theta"],
+                     xi=HESTON_UNIFIED["xi"], rho=HESTON_UNIFIED["rho"],
+                     v0=HESTON_UNIFIED["v0"])
+    for S in S_UNIFIED])
+
+print()
+print_row("heston_pinn",   pred_pinn_u,     ref_u, "OOD (diff params)")
+print_row("hainaut_orig",  pred_hainaut_u,  ref_u, "theta略OOD")
+print_row("unified_v2",    pred_unified_u,  ref_u, "in-distribution")
+print_row("parametric",    pred_param_u,    ref_u, "in-distribution")
+
+print("\nSample prices (S, ref, heston_pinn, hainaut, unified, parametric):")
 for i in [5, 15, 25, 35, 45]:
-    S = S_GRID[i]
-    print(f"  S={S:6.1f}  ref={ref[i]:8.4f}  "
-          f"pinn={pinn_prices[i]:8.4f}  hainaut={hainaut_prices[i]:8.4f}")
+    S = S_UNIFIED[i]
+    print(f"  S={S:6.1f}  ref={ref_u[i]:7.4f}  "
+          f"pinn={pred_pinn_u[i]:7.4f}  "
+          f"hainaut={pred_hainaut_u[i]:7.4f}  "
+          f"unified={pred_unified_u[i]:7.4f}  "
+          f"param={pred_param_u[i]:7.4f}")
