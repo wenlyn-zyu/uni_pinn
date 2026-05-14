@@ -28,8 +28,11 @@ S_GRID = np.linspace(50, 250, 50)
 
 BSM_PARAMS    = dict(sigma=0.2)
 CEV_PARAMS    = dict(sigma=0.25, beta=0.5)
+# 独立 CEV PINN 实际训练参数（从 checkpoint 读取）
+CEV_INDEP     = dict(sigma=0.2, beta=0.5)
 # 独立 Heston PINN 实际训练参数（从 checkpoint 读取）
 HESTON_INDEP  = dict(kappa=1.0, theta=0.08, xi=0.39, rho=-0.93, v0=0.04)
+r_HESTON_INDEP = 0.1   # Heston 独立 PINN 训练时用的 r
 # Unified v2 训练时覆盖的 Heston 参数集（取代表性一组）
 HESTON_UNIFIED = dict(kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04)
 
@@ -159,7 +162,9 @@ def eval_synthetic():
     # 参考解
     ref_bsm    = [bsm_call(S, K_SYN, T_SYN, r_SYN, **BSM_PARAMS)    for S in S_GRID]
     ref_cev    = [cev_call(S, K_SYN, T_SYN, r_SYN, **CEV_PARAMS)     for S in S_GRID]
-    ref_heston_i = [heston_call(S, K_SYN, T_SYN, r_SYN, **HESTON_INDEP)   for S in S_GRID]
+    # 独立 PINN 各自用训练时的参数生成参考解
+    ref_cev_i    = [cev_call(S, K_SYN, T_SYN, r_SYN, **CEV_INDEP)        for S in S_GRID]
+    ref_heston_i = [heston_call(S, K_SYN, T_SYN, r_HESTON_INDEP, **HESTON_INDEP) for S in S_GRID]
     ref_heston_u = [heston_call(S, K_SYN, T_SYN, r_SYN, **HESTON_UNIFIED) for S in S_GRID]
     ref_bsm_g    = [bsm_greeks(S, K_SYN, T_SYN, r_SYN, **BSM_PARAMS)      for S in S_GRID]
     ref_heston_g = [heston_greeks_fd(S, K_SYN, T_SYN, r_SYN, **HESTON_UNIFIED) for S in S_GRID]
@@ -193,9 +198,20 @@ def eval_synthetic():
     heston_pinn = load_indep_heston()
 
     pred_bsm_i    = [bsm_pinn.price(S) / bsm_pinn.K    for S in S_GRID]
-    pred_cev_i    = [cev_pinn.price(S) * cev_pinn.K    for S in S_GRID]
-    pred_heston_i = [heston_pinn.price(S) for S in S_GRID]
-    add_price("indep", pred_bsm_i, pred_cev_i, pred_heston_i, ref_heston_i)
+    pred_cev_i    = [cev_pinn.price(S)                  for S in S_GRID]
+    pred_heston_i = [heston_pinn.price(S)               for S in S_GRID]
+    # 独立 PINN 用各自训练参数的参考解评估（验证拟合能力）
+    bm, br = _mse_relmse(pred_bsm_i, ref_bsm)
+    cm, cr = _mse_relmse(pred_cev_i, ref_cev_i)
+    hm, hr = _mse_relmse(pred_heston_i, ref_heston_i)
+    rows_price.append({
+        "model": "indep",
+        "bsm_mse": bm, "bsm_relmse": br,
+        "cev_mse": cm, "cev_relmse": cr,
+        "heston_mse": hm, "heston_relmse": hr,
+    })
+    print(f"  {'indep':20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
+          f"Heston RelMSE={hr:.4f}")
 
     # ── Unified v2 ──
     print("加载 Unified v2...")
