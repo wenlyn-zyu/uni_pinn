@@ -293,23 +293,25 @@ def fig_price_curves():
     p_cev    = ModelParams.from_cev(sigma=0.20, beta=0.5)
     p_heston = ModelParams.from_heston(kappa=2.0, theta=0.04, xi=0.3,
                                        rho=-0.7, v0=0.04)
+    ref_bsm    = np.array([bsm_call(s, K, T, r, 0.20) for s in S])
+    ref_cev    = np.array([cev_call(s, K, T, r, 0.20, 0.5) for s in S])
+    ref_heston = np.array([heston_call(s, K, T, r, 2.0, 0.04, 0.3, -0.7, 0.04) for s in S])
+    pred_bsm    = _unified_price(pinn, S, p_bsm)
+    pred_cev    = _unified_price(pinn, S, p_cev)
+    pred_heston = _unified_price(pinn, S, p_heston)
+
     configs = [
-        ("BSM",
-         np.array([bsm_call(s, K, T, r, 0.20) for s in S]),
-         _unified_price(pinn, S, p_bsm)),
-        (r"CEV ($\beta\!=\!0.5$)",
-         np.array([cev_call(s, K, T, r, 0.20, 0.5) for s in S]),
-         _unified_price(pinn, S, p_cev)),
-        ("Heston",
-         np.array([heston_call(s, K, T, r, 2.0, 0.04, 0.3, -0.7, 0.04) for s in S]),
-         _unified_price(pinn, S, p_heston)),
+        ("BSM",                  ref_bsm,    pred_bsm),
+        (r"CEV ($\beta\!=\!0.5$)", ref_cev,  pred_cev),
+        ("Heston",               ref_heston, pred_heston),
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
     for ax, (title, ref, pred) in zip(axes, configs):
-        ax.plot(S, ref,  color="black", lw=2.0, label="Reference", zorder=4)
-        ax.plot(S, pred, color=C2, lw=1.6, linestyle="--",
-                label="Unified PINN", zorder=3)
+        ax.plot(S, ref,  color="black", lw=2.2, label="Reference", zorder=4)
+        # plot PINN as scatter markers so it's visible even when overlapping
+        ax.plot(S[::4], pred[::4], color=C2, marker="o", markersize=4,
+                linestyle="none", label="Unified PINN", zorder=5)
         ax.axvline(K, color=GRAY, lw=0.7, linestyle=":", alpha=0.6)
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
@@ -338,24 +340,30 @@ def fig_error_dist():
     p_cev    = ModelParams.from_cev(sigma=0.20, beta=0.5)
     p_heston = ModelParams.from_heston(kappa=2.0, theta=0.04, xi=0.3,
                                        rho=-0.7, v0=0.04)
+    ref_bsm    = np.array([bsm_call(s, K, T, r, 0.20) for s in S])
+    ref_cev    = np.array([cev_call(s, K, T, r, 0.20, 0.5) for s in S])
+    ref_heston = np.array([heston_call(s, K, T, r, 2.0, 0.04, 0.3, -0.7, 0.04) for s in S])
+    pred_bsm    = _unified_price(pinn, S, p_bsm)
+    pred_cev    = _unified_price(pinn, S, p_cev)
+    pred_heston = _unified_price(pinn, S, p_heston)
+
     configs = [
-        ("BSM",
-         np.array([bsm_call(s, K, T, r, 0.20) for s in S]),
-         _unified_price(pinn, S, p_bsm)),
-        (r"CEV ($\beta\!=\!0.5$)",
-         np.array([cev_call(s, K, T, r, 0.20, 0.5) for s in S]),
-         _unified_price(pinn, S, p_cev)),
-        ("Heston",
-         np.array([heston_call(s, K, T, r, 2.0, 0.04, 0.3, -0.7, 0.04) for s in S]),
-         _unified_price(pinn, S, p_heston)),
+        ("BSM",                  ref_bsm,    pred_bsm,    None),
+        (r"CEV ($\beta\!=\!0.5$)", ref_cev,  pred_cev,    ref_cev > 0.01),
+        ("Heston",               ref_heston, pred_heston, None),
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
-    for ax, (title, ref, pred) in zip(axes, configs):
+    for ax, (title, ref, pred, mask) in zip(axes, configs):
         err = np.abs(pred - ref)
-        ymax = max(err.max() * 1.18, 0.01)
-        ax.fill_between(S, err, alpha=0.25, color=C1)
-        ax.plot(S, err, color=C1, lw=1.8, zorder=3)
+        if mask is not None:
+            # only show error where reference is numerically reliable
+            S_plot, err_plot = S[mask], err[mask]
+        else:
+            S_plot, err_plot = S, err
+        ymax = max(err_plot.max() * 1.18, 0.01)
+        ax.fill_between(S_plot, err_plot, alpha=0.25, color=C1)
+        ax.plot(S_plot, err_plot, color=C1, lw=1.8, zorder=3)
         ax.axvspan(80, 120, alpha=0.10, color=C3, zorder=1)
         ax.text(100, ymax * 0.88, "ATM", ha="center", fontsize=8,
                 color=C3, zorder=4)
@@ -397,12 +405,21 @@ def fig_eval_compare():
     ind_bsm = ind_cev = None
     try:
         ib = _load_indep("indep_bsm")
-        ind_bsm = np.array([ib.price(float(s)) for s in S])
+        raw = np.array([ib.price(float(s)) for s in S])
+        # sanity check: prices must be in [0, S_max]
+        if raw.max() < 300 and raw.min() >= 0:
+            ind_bsm = raw
+        else:
+            print(f"  indep BSM prices out of range (max={raw.max():.1f}), skipping")
     except Exception as e:
         print(f"  indep BSM unavailable: {e}")
     try:
         ic = _load_indep("indep_cev")
-        ind_cev = np.array([ic.price(float(s)) for s in S])
+        raw = np.array([ic.price(float(s)) for s in S])
+        if raw.max() < 300 and raw.min() >= 0:
+            ind_cev = raw
+        else:
+            print(f"  indep CEV prices out of range (max={raw.max():.1f}), skipping")
     except Exception as e:
         print(f"  indep CEV unavailable: {e}")
 
@@ -413,12 +430,12 @@ def fig_eval_compare():
 
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
     for ax, title, ref, uni, ind in zip(axes, titles, refs, unis, inds):
-        ax.plot(S, ref, color="black", lw=2.0, label="Reference",       zorder=4)
-        ax.plot(S, uni, color=C1,     lw=1.6, linestyle="--",
-                label="Unified PINN",   zorder=3)
+        ax.plot(S, ref, color="black", lw=2.2, label="Reference",     zorder=4)
+        ax.plot(S[::4], uni[::4], color=C1, marker="o", markersize=4,
+                linestyle="none", label="Unified PINN", zorder=5)
         if ind is not None:
-            ax.plot(S, ind, color=C2, lw=1.6, linestyle=":",
-                    label="Independent PINN", zorder=3)
+            ax.plot(S[::4], ind[::4], color=C2, marker="s", markersize=4,
+                    linestyle="none", label="Independent PINN", zorder=5)
         ax.axvline(K, color=GRAY, lw=0.7, linestyle=":", alpha=0.6)
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
