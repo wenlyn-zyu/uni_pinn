@@ -69,7 +69,7 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
 
 \subsection{PINN在期权定价中的应用}
 
-Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格与Greeks的同步计算。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，通过对模型参数和合约特征的联合参数化，实现了训练一次、多参数组合即时定价。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。
+Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。Bae等人\cite{bae2024localvol}将PINN扩展至BSM、CEV及Dupire局部波动率模型，实现了期权价格与Greeks的同步计算。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，将模型参数$(\kappa,\theta,\xi,\rho)$与合约特征$(S,v,t,T,r)$联合作为网络输入，实现了训练一次、多参数组合即时定价；该模型以PUT期权为输出，通过put-call parity转换为CALL价格。本文将其作为参数化Heston PINN的对比基准，在第~\ref{sec:compare}节中对其进行复现与评估。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。
 
 \subsection{三种独立PINN的复现与基准建立}\label{subsec:reproduction}
 
@@ -104,12 +104,14 @@ Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定�
     \hline
     BSM-PINN      & 解析解           & 0.016 & 0.6\%  & 门控网络，2+4层$\times$64，Tanh \\
     CEV-PINN      & 非中心卡方解析解 & 0.074 & 1.69\% & 门控网络，2+4层$\times$64，Tanh \\
-    Heston-ICPINN & 特征函数半解析解 & 0.35  & 3.9\%  & AuxNet(3$\times$40)+MainNet(8$\times$40) \\
+    Hainaut \& Casas (2024) & GL半解析解 & --- & 1.71\%* & 参数化PINN，4层$\times$40，Tanh \\
     \hline
   \end{tabular}
+
+  {\footnotesize *Hainaut模型以PUT为输出，经put-call parity转换为CALL价格，仅统计$S/K\geq 0.85$区域。}
 \end{table}
 
-上述三个独立PINN验证了各模型PDE的可解性，并为后续统一框架提供了精度基准。
+上述三个独立PINN验证了各模型PDE的可解性，并为后续统一框架提供了精度基准。其中ICPINN方法在统一参数集（$\kappa\theta$较小）下因Fichera退化边界条件无法收敛，本文以Hainaut \& Casas (2024)的参数化PINN作为Heston独立基线。
 
 \subsection{现有工作的局限性}
 
