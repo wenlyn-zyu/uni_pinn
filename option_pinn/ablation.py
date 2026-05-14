@@ -91,7 +91,20 @@ class DirectOutputNet(nn.Module):
 # Build standard param list (same as llm_router / eval_all)
 # ---------------------------------------------------------------------------
 
-def build_param_list():
+def _param_key(p) -> str:
+    """Unique string key for a ModelParams instance."""
+    return f"s{p.sigma:.3f}_b{p.beta:.2f}_k{p.kappa:.2f}_t{p.theta:.3f}_x{p.xi:.2f}_r{p.rho:.2f}"
+
+
+def _model_type(p) -> str:
+    if p.xi > 1e-6:
+        return "heston"
+    if abs(p.beta - 1.0) > 1e-6:
+        return "cev"
+    return "bsm"
+
+
+def _build_param_list():
     params = []
     for sigma in [0.10, 0.15, 0.20, 0.25, 0.30, 0.35]:
         params.append(ModelParams.from_bsm(sigma=sigma))
@@ -105,6 +118,29 @@ def build_param_list():
                     params.append(ModelParams.from_heston(
                         kappa=kappa, theta=theta, xi=xi, rho=rho, v0=theta))
     return params
+
+
+def build_ref_data(param_list):
+    """Build ref_data dict keyed by integer index (as expected by UnifiedPINN)."""
+    from ref_solvers import cev_call as _cev_call
+    ref_data = {}
+    S_anchor = np.linspace(60, 160, 20)
+    v_anchor = np.full_like(S_anchor, 0.04)
+    t_anchor = np.full_like(S_anchor, 0.5)
+    for idx, p in enumerate(param_list):
+        mt = _model_type(p)
+        if mt == "bsm":
+            vals = [bsm_call(S, p.K, p.T, p.r, sigma=p.sigma) for S in S_anchor]
+        elif mt == "cev":
+            vals = [_cev_call(S, p.K, p.T, p.r, sigma=p.sigma, beta=p.beta)
+                    for S in S_anchor]
+        else:
+            vals = [heston_call(S, p.K, p.T, p.r,
+                                kappa=p.kappa, theta=p.theta,
+                                xi=p.xi, rho=p.rho, v0=p.v0)
+                    for S in S_anchor]
+        ref_data[idx] = (S_anchor, v_anchor, t_anchor, np.array(vals))
+    return ref_data
 
 
 # ---------------------------------------------------------------------------
@@ -141,25 +177,8 @@ def train_variant(variant: str, epochs: int, device: torch.device) -> dict:
     print(f"  Ablation variant: {variant}  ({epochs} epochs)")
     print(f"{'='*60}")
 
-    param_list = build_param_list()
-
-    # Build ref_data for data anchor (same as full model)
-    ref_data = {}
-    for p in param_list:
-        key = p.key()
-        S_anchor = np.linspace(60, 160, 20)
-        if p.model_type == "bsm":
-            vals = [bsm_call(S, p.K, p.T, p.r, sigma=p.sigma) for S in S_anchor]
-        elif p.model_type == "cev":
-            from ref_solvers import cev_call
-            vals = [cev_call(S, p.K, p.T, p.r, sigma=p.sigma, beta=p.beta)
-                    for S in S_anchor]
-        else:
-            vals = [heston_call(S, p.K, p.T, p.r,
-                                kappa=p.kappa, theta=p.theta,
-                                xi=p.xi, rho=p.rho, v0=p.v0)
-                    for S in S_anchor]
-        ref_data[key] = (S_anchor, np.array(vals))
+    param_list = _build_param_list()
+    ref_data = build_ref_data(param_list)
 
     pinn = UnifiedPINN(param_list, hidden=128, depth=6, device=device,
                        ref_data=ref_data)
