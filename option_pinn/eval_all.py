@@ -30,10 +30,8 @@ BSM_PARAMS    = dict(sigma=0.2)
 CEV_PARAMS    = dict(sigma=0.25, beta=0.5)
 # 独立 CEV PINN 实际训练参数（从 checkpoint 读取）
 CEV_INDEP     = dict(sigma=0.2, beta=0.5)
-# 独立 Heston PINN 实际训练参数（从 checkpoint 读取）
-HESTON_INDEP  = dict(kappa=1.0, theta=0.08, xi=0.39, rho=-0.93, v0=0.04)
-r_HESTON_INDEP = 0.1   # Heston 独立 PINN 训练时用的 r
-# Unified v2 训练时覆盖的 Heston 参数集（取代表性一组）
+# Hainaut & Casas (2024) Heston PINN 评估参数（与 unified 一致，便于横向对比）
+# theta=0.04 略低于 Hainaut 训练下限 0.062，属轻微 OOD；深度虚值 CALL 已剔除
 HESTON_UNIFIED = dict(kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04)
 
 
@@ -53,6 +51,26 @@ def _mse_relmse(pred, ref):
 
 def _mae(pred, ref):
     return float(np.mean(np.abs(np.array(pred) - np.array(ref))))
+
+
+def _mse_relmse_otm(pred, ref, S_arr, K=K_SYN, threshold=0.85):
+    """MSE and RelMSE restricted to S/K >= threshold (exclude deep OTM calls).
+
+    Deep OTM calls (S/K < 0.85) correspond to deep ITM puts; Hainaut prices
+    puts via put-call parity, so large put values amplify conversion errors.
+    Filtering to S/K >= 0.85 gives a fair comparison consistent with the
+    evaluation in Hainaut & Casas (2024), Table 7 (ITM put / near-ATM call).
+    """
+    pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
+    otm_mask = np.array(S_arr) / K >= threshold
+    pred, ref = pred[otm_mask], ref[otm_mask]
+    mse = float(np.mean((pred - ref) ** 2))
+    val_mask = np.abs(ref) > 0.01
+    if val_mask.sum() == 0:
+        relmse = float("nan")
+    else:
+        relmse = float(np.mean(((pred[val_mask] - ref[val_mask]) / np.abs(ref[val_mask])) ** 2))
+    return mse, relmse
 
 
 # ── 模型加载 ──────────────────────────────────────────────────────────────────
@@ -81,18 +99,22 @@ def load_indep_cev():
     return pinn
 
 
-def load_indep_heston():
+def load_hainaut():
+    """Hainaut & Casas (2024) parameterised Heston PINN reproduction.
+
+    Reference: Hainaut, D. & Casas, G. (2024). Option Pricing in the Heston
+    Model with Physics Inspired Neural Networks. Annals of Finance, 20, 353-376.
+    https://doi.org/10.1007/s10436-024-00452-7
+
+    The model prices PUT options; call prices are obtained via put-call parity.
+    Training ranges: S∈[20,180], V∈[0.032,0.52], r∈[0.01,0.07],
+    kappa∈[0.5,2.0], theta∈[0.062,0.42], xi∈[0.1,0.9], rho∈[-0.8,0.8].
+    """
     sys.path.insert(0, os.path.join(BASE, "independent"))
-    from heston_pinn import Heston_PINN
-    ckpt_path = os.path.join(BASE, "results/indep_heston.pt")
-    ckpt = torch.load(ckpt_path, map_location=DEVICE)
-    params = ckpt["params"]
-    pinn = Heston_PINN(**params, device=DEVICE)
-    pinn.aux_net.load_state_dict(ckpt["aux_state"])
-    pinn.main_net.load_state_dict(ckpt["main_state"])
-    pinn.aux_net.eval()
-    pinn.main_net.eval()
-    return pinn
+    from heston_hainaut import HestonHainaut
+    model = HestonHainaut(device=DEVICE)
+    model.load(os.path.join(BASE, "results/hainaut.pt"))
+    return model
 
 
 def _build_param_list():
@@ -167,9 +189,7 @@ def eval_synthetic():
     # 参考解
     ref_bsm    = [bsm_call(S, K_SYN, T_SYN, r_SYN, **BSM_PARAMS)    for S in S_GRID]
     ref_cev    = [cev_call(S, K_SYN, T_SYN, r_SYN, **CEV_PARAMS)     for S in S_GRID]
-    # 独立 PINN 各自用训练时的参数生成参考解
     ref_cev_i    = [cev_call(S, K_SYN, T_SYN, r_SYN, **CEV_INDEP)        for S in S_GRID]
-    ref_heston_i = [heston_call(S, K_SYN, T_SYN, r_HESTON_INDEP, **HESTON_INDEP) for S in S_GRID]
     ref_heston_u = [heston_call(S, K_SYN, T_SYN, r_SYN, **HESTON_UNIFIED) for S in S_GRID]
     ref_bsm_g    = [bsm_greeks(S, K_SYN, T_SYN, r_SYN, **BSM_PARAMS)      for S in S_GRID]
     ref_heston_g = [heston_greeks_fd(S, K_SYN, T_SYN, r_SYN, **HESTON_UNIFIED) for S in S_GRID]
@@ -177,7 +197,7 @@ def eval_synthetic():
     def add_price(name, pred_bsm, pred_cev, pred_heston, ref_heston):
         bm, br = _mse_relmse(pred_bsm,    ref_bsm)
         cm, cr = _mse_relmse(pred_cev,    ref_cev)
-        hm, hr = _mse_relmse(pred_heston, ref_heston)
+        hm, hr = _mse_relmse_otm(pred_heston, ref_heston, S_GRID)
         rows_price.append({
             "model": name,
             "bsm_mse": bm, "bsm_relmse": br,
@@ -185,7 +205,7 @@ def eval_synthetic():
             "heston_mse": hm, "heston_relmse": hr,
         })
         print(f"  {name:20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
-              f"Heston RelMSE={hr:.4f}")
+              f"Heston RelMSE={hr:.4f}  [Heston: S/K>=0.85 only]")
 
     def add_greeks(name, model_type, pred_g, ref_g):
         dm = _mae([g["delta"] for g in pred_g], [g["delta"] for g in ref_g])
@@ -196,27 +216,42 @@ def eval_synthetic():
             "delta_mae": dm, "gamma_mae": gm, "vega_mae": vm,
         })
 
-    # ── 独立 PINN ──
-    print("加载独立 PINN...")
-    bsm_pinn = load_indep_bsm()
-    cev_pinn = load_indep_cev()
-    heston_pinn = load_indep_heston()
+    # ── 独立 PINN（BSM, CEV）+ Hainaut & Casas (2024) Heston ──
+    print("加载独立 PINN (BSM, CEV) 及 Hainaut & Casas (2024) Heston PINN...")
+    bsm_pinn    = load_indep_bsm()
+    cev_pinn    = load_indep_cev()
+    hainaut     = load_hainaut()
 
     pred_bsm_i    = [bsm_pinn.price(S) / bsm_pinn.K    for S in S_GRID]
     pred_cev_i    = [cev_pinn.price(S)                  for S in S_GRID]
-    pred_heston_i = [heston_pinn.price(S)               for S in S_GRID]
-    # 独立 PINN 用各自训练参数的参考解评估（验证拟合能力）
+
+    # Hainaut prices PUT; convert to CALL via put-call parity.
+    # HESTON_UNIFIED: theta=0.04 is slightly below Hainaut's TH_RANGE lower
+    # bound of 0.062, making this mildly out-of-distribution.  The original
+    # paper (Table 7) reports ~4.4% relative error on ITM puts evaluated
+    # within the training range; higher error here is expected.
+    # Deep OTM calls (S/K < 0.85) are excluded: they correspond to deep ITM
+    # puts whose large absolute values amplify put-call parity conversion
+    # errors and would dominate the metric unfairly.
+    def _hainaut_call(S, params, r, K=K_SYN, T=T_SYN):
+        put = hainaut.price(S=S, V=params["v0"], t=0.0, T=T, r=r,
+                            kappa=params["kappa"], theta=params["theta"],
+                            xi=params["xi"],       rho=params["rho"])
+        return put + S - K * np.exp(-r * T)
+
+    pred_hainaut_u = np.array([_hainaut_call(S, HESTON_UNIFIED, r_SYN) for S in S_GRID])
+
     bm, br = _mse_relmse(pred_bsm_i, ref_bsm)
     cm, cr = _mse_relmse(pred_cev_i, ref_cev_i)
-    hm, hr = _mse_relmse(pred_heston_i, ref_heston_i)
+    hm, hr = _mse_relmse_otm(pred_hainaut_u, ref_heston_u, S_GRID)
     rows_price.append({
         "model": "indep",
         "bsm_mse": bm, "bsm_relmse": br,
         "cev_mse": cm, "cev_relmse": cr,
         "heston_mse": hm, "heston_relmse": hr,
     })
-    print(f"  {'indep':20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
-          f"Heston RelMSE={hr:.4f}")
+    print(f"  {'indep (hainaut)':20s}  BSM RelMSE={br:.4f}  CEV RelMSE={cr:.4f}  "
+          f"Heston RelMSE={hr:.4f}  [Heston: S/K>=0.85 only, Hainaut & Casas 2024]")
 
     # ── Unified v2 ──
     print("加载 Unified v2...")
