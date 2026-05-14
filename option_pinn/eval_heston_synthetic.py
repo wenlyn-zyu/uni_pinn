@@ -101,7 +101,7 @@ ref_hainaut_id = np.array([heston_call(S, K_SYN, T_SYN, r_HAINAUT, **HESTON_HAIN
 
 hainaut_id_prices = []
 for S in S_GRID_HAINAUT:
-    put_norm = hainaut.price(
+    put_abs = hainaut.price(
         S=S, V=HESTON_HAINAUT_ID["v0"], t=0.0, T=T_SYN,
         r=r_HAINAUT,
         kappa=HESTON_HAINAUT_ID["kappa"],
@@ -109,7 +109,7 @@ for S in S_GRID_HAINAUT:
         xi=HESTON_HAINAUT_ID["xi"],
         rho=HESTON_HAINAUT_ID["rho"],
     )
-    put_abs = put_norm * HestonHainaut.K_STRIKE
+    # price() returns absolute put price; convert to call via put-call parity
     call = put_abs + S - K_SYN * np.exp(-r_HAINAUT * T_SYN)
     hainaut_id_prices.append(call)
 hainaut_id_prices = np.array(hainaut_id_prices)
@@ -122,7 +122,7 @@ print(f"  MSE={mse(hainaut_id_prices, ref_hainaut_id):.4e}  "
 print("\n  Sample prices (S, ref_call, hainaut_call, put_norm):")
 for i in [10, 20, 30, 40, 49]:
     S = S_GRID_HAINAUT[i]
-    put_norm = hainaut.price(
+    put_abs = hainaut.price(
         S=S, V=HESTON_HAINAUT_ID["v0"], t=0.0, T=T_SYN,
         r=r_HAINAUT,
         kappa=HESTON_HAINAUT_ID["kappa"],
@@ -130,10 +130,9 @@ for i in [10, 20, 30, 40, 49]:
         xi=HESTON_HAINAUT_ID["xi"],
         rho=HESTON_HAINAUT_ID["rho"],
     )
-    put_abs = put_norm * HestonHainaut.K_STRIKE
     call = put_abs + S - K_SYN * np.exp(-r_HAINAUT * T_SYN)
     ref = heston_call(S, K_SYN, T_SYN, r_HAINAUT, **HESTON_HAINAUT_ID)
-    print(f"    S={S:.1f}  ref={ref:.4f}  hainaut={call:.4f}  put_norm={put_norm:.4f}")
+    print(f"    S={S:.1f}  ref={ref:.4f}  hainaut={call:.4f}  put_abs={put_abs:.4f}")
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
