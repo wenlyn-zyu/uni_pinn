@@ -1,6 +1,7 @@
 # Results and checkpoints (large binary files)
 results/
 !results/.gitkeep
+!results/*.csv
 
 # Python cache
 __pycache__/
