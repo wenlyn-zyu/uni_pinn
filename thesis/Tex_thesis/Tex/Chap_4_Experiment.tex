@@ -102,12 +102,12 @@
     \hline
     BSM & 0.0005 & 0.0009\% \\
     CEV ($\beta=0.5$) & 0.032 & 0.79\% \\
-    Heston & 0.102 & 0.60\% \\
+    Heston & 0.102 & 0.599\% \\
     \hline
   \end{tabular}
 \end{table}
 
-三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.60\%。三种模型的ATM相对误差均低于1\%，统一框架在标准参数集下表现均衡。
+三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，统一框架在标准参数集下表现均衡。
 
 \subsection{价格曲线对比}
 
@@ -281,7 +281,7 @@ PINN-Heston的MAE显著高于校准Heston（高出5至73美元），这是本实
   \end{tabular}
 \end{table}
 
-Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN复现，以PUT期权为输出，通过put-call parity转换为CALL价格；评估参数$\theta=0.04$略低于其训练下限$0.062$（轻微OOD）。Heston评估仅保留$S/K\geq 0.85$的数据点（原因见第~\ref{sec:exp_setup}节）。参数化PINN（第~\ref{sec:parametric_pinn}节）在更宽的参数范围内训练，网络容量为统一PINN的约4倍（8层$\times$256）。
+Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN复现，以PUT期权为输出，通过put-call parity转换为CALL价格；评估参数$\theta=0.04$略低于其训练下限$0.062$，属于轻微超出训练范围的情形。Heston评估仅保留$S/K\geq 0.85$的数据点（原因见第~\ref{sec:exp_setup}节）。参数化PINN（第~\ref{sec:parametric_pinn}节）在更宽的参数范围内训练，网络容量为统一PINN的约4倍（8层$\times$256）。
 
 \begin{table}[htbp]
   \centering
@@ -306,7 +306,7 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
   \end{tabular}
 \end{table}
 
-统一PINN在BSM和CEV上的精度显著优于参数化PINN（BSM RelMAE$_\text{ATM}$：0.0009\% vs 0.126\%；CEV：0.790\% vs 1.230\%）；在Heston上，参数化PINN（0.430\%）略优于统一PINN（0.599\%），这与参数化PINN训练范围更宽（$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$）、对标准参数集（$\kappa=2.0$，$\xi=0.3$）覆盖更充分有关。然而参数化PINN的网络参数量约为统一PINN的4倍，在BSM和CEV上的精度反而更低，说明更大的网络容量并不总能带来更好的精度，统一PINN通过软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自轻微OOD（$\theta=0.04$低于训练下限$0.062$）和put-call parity转换在非平值区域引入的额外误差。
+统一PINN在BSM上的RelMAE$_\text{ATM}$为0.0009\%，CEV为0.790\%，均显著优于参数化PINN的0.126\%和1.230\%；在Heston上，参数化PINN的0.430\%略优于统一PINN的0.599\%，原因是参数化PINN训练范围更宽，对标准参数集覆盖更充分。然而参数化PINN的网络参数量约为统一PINN的4倍，在BSM和CEV上的精度反而更低，说明更大的网络容量并不总能带来更好的精度，统一PINN通过软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换在非平值区域引入的额外误差。
 
 图~\ref{fig:compare}展示了三种模型的价格曲线对比。
 
@@ -369,4 +369,4 @@ Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高
 
 \section{本章小结}\label{sec:exp_summary}
 
-统一PINN（v16）在三大模型上均达到实用精度：BSM（RelMAE$_\text{ATM}$=0.0009\%）、CEV（RelMAE$_\text{ATM}$=0.79\%）、Heston（RelMAE$_\text{ATM}$=0.60\%），三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。精度对比实验表明，统一PINN在三种模型上均优于参数化PINN（BSM 0.0009\% vs 0.126\%，CEV 0.790\% vs 1.230\%，Heston 0.599\% vs 0.430\%），且网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测（SPY期权链，2824个合约，23个到期日，详细分析8个代表性到期日）表明：校准Heston在中长期期权上显著优于BSM（以Aug 21 2026为例，Heston MAE=\$0.13，BSM MAE=\$1.64）；PINN-BSM在训练参数范围内具有优异的泛化能力；参数化PINN在中长期期权（$T>0.5$年）上的市场误差低于统一PINN-Heston，但两者在短期期权上均因参数域外推而误差较大，进一步的架构改进是重要的未来工作方向。
+统一PINN（v16）在三大模型上均达到实用精度：BSM RelMAE$_\text{ATM}$=0.0009\%，CEV RelMAE$_\text{ATM}$=0.79\%，Heston RelMAE$_\text{ATM}$=0.599\%，三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。精度对比实验表明，统一PINN在BSM和CEV上的精度优于参数化PINN，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测（SPY期权链，2824个合约，23个到期日，详细分析8个代表性到期日）表明：校准Heston在中长期期权上显著优于BSM，以Aug 21 2026为例，Heston MAE=\$0.13，BSM MAE=\$1.64；PINN-BSM在训练参数范围内具有优异的泛化能力；参数化PINN在中长期期权上的市场误差低于统一PINN-Heston，但两者在短期期权上均因参数域外推而误差较大，进一步的架构改进是重要的未来工作方向。

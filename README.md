@@ -113,7 +113,7 @@ Outputs PDF figures to `thesis/Tex_thesis/Tex/Img/`.
 |-------|-----|--------------|
 | BSM | 0.0005 | 0.0009% |
 | CEV (β=0.5, σ=0.20) | 0.032 | 0.79% |
-| Heston | 0.102 | 0.60% |
+| Heston | 0.102 | 0.599% |
 
 Inference: ~2 ms (GPU), ~8 ms (CPU). LLM routing: 100% accuracy on 20 test cases.
 
