@@ -109,14 +109,13 @@ def calibrate_cev(calls, S, Ks, T, r):
         return float(np.sum(weights * errs**2))
 
     best_val, best_p = 1e9, (0.2, 0.5)
-    for s0 in [0.10, 0.15, 0.20, 0.25]:
-        for b0 in [0.3, 0.5, 0.7, 0.9]:
-            res = minimize(obj, [s0, b0],
-                           bounds=[(0.01, 1.0), (0.01, 1.0)],
-                           method="L-BFGS-B",
-                           options={"maxiter": 200, "ftol": 1e-10})
-            if res.fun < best_val:
-                best_val, best_p = res.fun, res.x
+    for s0, b0 in [(0.15, 0.5), (0.20, 0.7), (0.10, 0.3), (0.25, 0.9)]:
+        res = minimize(obj, [s0, b0],
+                       bounds=[(0.01, 1.0), (0.01, 1.0)],
+                       method="L-BFGS-B",
+                       options={"maxiter": 100, "ftol": 1e-8})
+        if res.fun < best_val:
+            best_val, best_p = res.fun, res.x
     return float(best_p[0]), float(best_p[1])
 
 
@@ -184,16 +183,12 @@ def calibrate_heston(calls, S, Ks, T, r):
         [2.0, 0.04, 0.3, -0.7, 0.04],
         [1.0, 0.02, 0.2, -0.5, 0.02],
         [5.0, 0.06, 0.5, -0.8, 0.06],
-        [8.0, 0.04, 0.4, -0.9, 0.04],
         [0.5, 0.03, 0.1, -0.6, 0.03],
-        [3.0, 0.05, 0.6, -0.75, 0.05],
-        [10.0, 0.08, 0.8, -0.85, 0.08],
-        [1.5, 0.025, 0.15, -0.55, 0.025],
     ]
     best_val, best_p = 1e9, starts[0]
     for x0 in starts:
         res = minimize(obj, x0, bounds=bounds, method="L-BFGS-B",
-                       options={"maxiter": 500, "ftol": 1e-12})
+                       options={"maxiter": 150, "ftol": 1e-9})
         if res.fun < best_val:
             best_val, best_p = res.fun, res.x
     return tuple(float(x) for x in best_p)
@@ -304,32 +299,33 @@ def main():
             heston_prices = heston_prices_gl(
                 S, Ks, T_val, r, kappa_h, theta_h, xi_h, rho_h, v0_h)
 
-        # --- Parametric PINN pricing ---
-        # Normalize: PINN trained with K_REF=100, so scale S and K
-        scale = S / 100.0
+        # --- Parametric PINN pricing (batch per expiry) ---
+        scale  = S / 100.0
         T_safe = max(T_val, 0.01)
+        Ks_n   = 100.0 * Ks / S   # normalized strikes
 
-        pinn_bsm_prices = np.array([
-            model.price(S=100.0, K=100.0 * K / S, T=T_safe, r=r,
-                        sigma=sigma_bsm, beta=1.0,
-                        kappa=0.0, theta=0.0, xi=0.0, rho=0.0) * scale
-            for K in Ks
-        ])
+        def pinn_batch(sigma, beta, kappa, theta, xi, rho, v0):
+            """Price all strikes for one expiry in a single forward pass."""
+            import torch
+            nb = len(Ks_n)
+            dev = model.device
+            S_t   = torch.full((nb, 1), 100.0,   dtype=torch.float32, device=dev)
+            v_t   = torch.full((nb, 1), v0,       dtype=torch.float32, device=dev)
+            tau_t = torch.full((nb, 1), T_safe,   dtype=torch.float32, device=dev)
+            K_t   = torch.tensor(Ks_n, dtype=torch.float32, device=dev).reshape(-1, 1)
+            r_t   = torch.full((nb, 1), r,        dtype=torch.float32, device=dev)
+            lam_t = torch.tensor(
+                [[sigma, beta, kappa, theta, xi, rho]] * nb,
+                dtype=torch.float32, device=dev)
+            model.net.eval()
+            with torch.no_grad():
+                out = model.net(S_t, v_t, tau_t, K_t, r_t, lam_t)
+            return out.cpu().numpy().flatten() * scale
 
-        pinn_cev_prices = np.array([
-            model.price(S=100.0, K=100.0 * K / S, T=T_safe, r=r,
-                        sigma=sigma_cev, beta=beta_cev,
-                        kappa=0.0, theta=0.0, xi=0.0, rho=0.0) * scale
-            for K in Ks
-        ])
-
-        pinn_heston_prices = np.array([
-            model.price(S=100.0, K=100.0 * K / S, T=T_safe, r=r,
-                        sigma=0.0, beta=1.0,
-                        kappa=kappa_h, theta=theta_h,
-                        xi=xi_h, rho=rho_h, v0=v0_h) * scale
-            for K in Ks
-        ])
+        v0_bsm = sigma_bsm ** 2
+        pinn_bsm_prices    = pinn_batch(sigma_bsm, 1.0,      0.0,     0.0,     0.0,   0.0,   v0_bsm)
+        pinn_cev_prices    = pinn_batch(sigma_cev,  beta_cev, 0.0,     0.0,     0.0,   0.0,   sigma_cev**2)
+        pinn_heston_prices = pinn_batch(0.0,        1.0,      kappa_h, theta_h, xi_h,  rho_h, v0_h)
 
         # --- MAE ---
         def mae(pred):
