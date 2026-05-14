@@ -113,19 +113,22 @@ def main():
     heston_idx = _find_heston_idx(param_list, **{k: v for k, v in HESTON_FT.items() if k != "v0"})
     print(f"Heston 参数索引: {heston_idx}")
 
-    # ── 构建 ref_data：用 SPY mid-price 作为数据锚点 ──
+    # ── 构建 ref_data：把 SPY 合约映射到训练域（K=100 基准）──
     p = param_list[heston_idx]
-    S_arr = df["S"].values.astype(np.float32)
+    K_SYN = 100.0
+    # moneyness 保持不变：S_scaled = (S/K) * K_SYN
+    S_arr = (df["S"].values / df["K"].values * K_SYN).astype(np.float32)
+    # 价格按比例缩放：V_scaled = mid / K * K_SYN
+    V_arr = (df["mid"].values / df["K"].values * K_SYN).astype(np.float32)
     # 用 v0 作为初始方差（固定）
     v_arr = np.full(len(df), HESTON_FT["v0"], dtype=np.float32)
     # t=0（当前时刻），tau 作为 T（到期时间）
     t_arr = np.zeros(len(df), dtype=np.float32)
-    V_arr = df["mid"].values.astype(np.float32)
 
-    # 过滤掉 S 超出 S_max 的合约
-    mask = S_arr < p.S_max
+    # 过滤掉 S_scaled 超出 S_max 的合约（应该都在范围内了）
+    mask = (S_arr < p.S_max) & (S_arr > 0) & np.isfinite(V_arr)
     S_arr, v_arr, t_arr, V_arr = S_arr[mask], v_arr[mask], t_arr[mask], V_arr[mask]
-    print(f"过滤后合约数: {len(S_arr)}")
+    print(f"映射后有效合约数: {len(S_arr)}")
 
     ref_data = {heston_idx: (S_arr, v_arr, t_arr, V_arr)}
 
@@ -158,7 +161,9 @@ def main():
     print("\n验证（前5条合约）:")
     print(f"{'S':>8} {'K':>8} {'tau':>6} {'mid':>8} {'pred':>8}")
     for _, row in sample.iterrows():
-        pred = pinn_ft.price(p_heston, row["S"])
+        S_scaled = row["S"] / row["K"] * K_SYN
+        pred_scaled = pinn_ft.price(p_heston, S_scaled)
+        pred = pred_scaled * row["K"] / K_SYN
         print(f"{row['S']:8.2f} {row['K']:8.2f} {row['tau']:6.3f} "
               f"{row['mid']:8.4f} {pred:8.4f}")
 

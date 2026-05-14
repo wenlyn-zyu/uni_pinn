@@ -339,6 +339,11 @@ def eval_market():
     df = _load_spy(spy_csv)
     print(f"有效合约数: {len(df)}")
 
+    # 所有 PINN 模型用 moneyness 映射到训练域（K_SYN=100）
+    K_SYN = 100.0
+    df["S_scaled"] = df["S"] / df["K"] * K_SYN   # moneyness * 100
+    df["V_scaled"] = df["mid"] / df["K"] * K_SYN  # 价格按比例缩放
+
     df["iv"] = df.apply(
         lambda row: _bsm_iv(row["S"], row["K"], row["tau"], 0.05, row["mid"]),
         axis=1)
@@ -362,38 +367,44 @@ def eval_market():
                      "relmse": round(relmse, 6), "n": int(mask.sum())})
         print(f"  {name:20s}  MSE={mse:.4f}  RelMSE={relmse:.4f}  n={mask.sum()}")
 
-    # 解析解基准
+    # 解析解基准（直接用原始价格）
     score("bsm_analytical",
           lambda row: bsm_call(row["S"], row["K"], row["tau"], 0.05, row["iv"]))
     score("heston_analytical",
           lambda row: heston_call(row["S"], row["K"], row["tau"], 0.05, **h))
 
-    # 独立 PINN
+    # 独立 PINN（moneyness 映射 + 反映射）
     bsm_pinn    = load_indep_bsm()
     cev_pinn    = load_indep_cev()
     heston_pinn = load_indep_heston()
-    score("indep_bsm",    lambda row: bsm_pinn.price(row["S"]) / bsm_pinn.K)
-    score("indep_cev",    lambda row: cev_pinn.price(row["S"]) / cev_pinn.K)
-    score("indep_heston", lambda row: heston_pinn.price(row["S"]))
+    score("indep_bsm",
+          lambda row: bsm_pinn.price(row["S_scaled"]) / bsm_pinn.K * row["K"])
+    score("indep_cev",
+          lambda row: cev_pinn.price(row["S_scaled"]) * row["K"] / K_SYN)
+    score("indep_heston",
+          lambda row: heston_pinn.price(row["S_scaled"]) * row["K"] / K_SYN)
 
-    # Unified v2
+    # Unified v2（moneyness 映射 + 反映射）
     from unified_pinn_v2 import ModelParams
     unified  = load_unified("unified_v16_gl.pt")
     p_heston = ModelParams.from_heston(**h)
-    score("unified_v2", lambda row: unified.price(p_heston, row["S"]))
+    score("unified_v2",
+          lambda row: unified.price(p_heston, row["S_scaled"]) * row["K"] / K_SYN)
 
     # Unified v2 fine-tuned
     ft_ckpt = os.path.join(BASE, "results/unified_v2_ft.pt")
     if os.path.exists(ft_ckpt):
         unified_ft = load_unified("unified_v2_ft.pt")
-        score("unified_v2_ft", lambda row: unified_ft.price(p_heston, row["S"]))
+        score("unified_v2_ft",
+              lambda row: unified_ft.price(p_heston, row["S_scaled"]) * row["K"] / K_SYN)
 
-    # 参数化 PINN
+    # 参数化 PINN（moneyness 映射 + 反映射）
     param_pinn = load_parametric()
     score("parametric",
           lambda row: param_pinn.price(
-              S=row["S"], K=row["K"], T=row["tau"], r=0.05,
-              kappa=h["kappa"], theta=h["theta"], xi=h["xi"], rho=h["rho"]))
+              S=row["S_scaled"], K=K_SYN, T=row["tau"], r=0.05,
+              kappa=h["kappa"], theta=h["theta"], xi=h["xi"], rho=h["rho"]
+          ) * row["K"] / K_SYN)
 
     out_path = os.path.join(BASE, "results/eval_market.csv")
     pd.DataFrame(rows).to_csv(out_path, index=False)
