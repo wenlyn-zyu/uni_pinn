@@ -378,7 +378,7 @@ def eval_market():
     cev_pinn    = load_indep_cev()
     heston_pinn = load_indep_heston()
     score("indep_bsm",
-          lambda row: bsm_pinn.price(row["S_scaled"]) / bsm_pinn.K * row["K"])
+          lambda row: bsm_pinn.price(row["S_scaled"]) / bsm_pinn.K * row["K"] / K_SYN)
     score("indep_cev",
           lambda row: cev_pinn.price(row["S_scaled"]) * row["K"] / K_SYN)
     score("indep_heston",
