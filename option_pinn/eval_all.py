@@ -442,17 +442,25 @@ def eval_market():
 
     # 加载模型
     from unified_pinn_v2 import ModelParams
-    unified   = load_unified("unified_v16_gl.pt")
+    unified    = load_unified("unified_v16_gl.pt")
     param_pinn = load_parametric()
+
+    ft_ckpt = os.path.join(BASE, "results/unified_v2_ft.pt")
+    unified_ft = load_unified("unified_v2_ft.pt") if os.path.exists(ft_ckpt) else None
+    if unified_ft:
+        print("已加载 unified_v2_ft")
 
     S_spot = float(df["S"].iloc[0])
     scale  = S_spot / K_REF
 
     rows_expiry  = []  # 按到期日
+    model_names = ["bsm_analytical", "heston_analytical", "unified_v2", "parametric"]
+    if unified_ft:
+        model_names.append("unified_v2_ft")
     # 汇总用累积列表
     acc = {m: {"mae_mkt": [], "mae_heston": [], "relmae_heston": [],
                "delta": [], "gamma": [], "vega": []}
-           for m in ("bsm_analytical", "heston_analytical", "unified_v2", "parametric")}
+           for m in model_names}
 
     expiry_groups = list(df.groupby("expiry_date"))
     print(f"到期日数: {len(expiry_groups)}")
@@ -478,14 +486,18 @@ def eval_market():
                                   for K in Ks])
 
         # ── Unified PINN（per-contract ModelParams）──
-        unified_prices = []
-        for K in Ks:
-            K_n = K_REF * K / S_spot
-            p = ModelParams.from_heston(K=K_n, T=max(T_val, 0.01), r=r_mkt,
-                                        kappa=kappa_h, theta=theta_h,
-                                        xi=xi_h, rho=rho_h, v0=v0_h)
-            unified_prices.append(unified.price(p, S=K_REF) * scale)
-        unified_prices = np.array(unified_prices)
+        def _unified_prices_for(model, Ks_arr):
+            out = []
+            for K in Ks_arr:
+                K_n = K_REF * K / S_spot
+                p = ModelParams.from_heston(K=K_n, T=max(T_val, 0.01), r=r_mkt,
+                                            kappa=kappa_h, theta=theta_h,
+                                            xi=xi_h, rho=rho_h, v0=v0_h)
+                out.append(model.price(p, S=K_REF) * scale)
+            return np.array(out)
+
+        unified_prices = _unified_prices_for(unified, Ks)
+        unified_ft_prices = _unified_prices_for(unified_ft, Ks) if unified_ft is not None else None
 
         # ── 参数化 PINN（per-contract）──
         param_prices = []
@@ -502,6 +514,7 @@ def eval_market():
         mae_heston_mkt  = _mae(heston_prices,  calls)
         mae_unified_mkt = _mae(unified_prices, calls)
         mae_param_mkt   = _mae(param_prices,   calls)
+        mae_unified_ft_mkt = _mae(unified_ft_prices, calls) if unified_ft_prices is not None else float("nan")
 
         # ── RelMAE vs Heston 解析解 ──
         def relmae(pred, ref):
@@ -510,12 +523,14 @@ def eval_market():
                 return float("nan")
             return float(np.mean(np.abs((pred[mask] - ref[mask]) / np.abs(ref[mask]))))
 
-        relmae_unified = relmae(unified_prices, heston_prices)
-        relmae_param   = relmae(param_prices,   heston_prices)
+        relmae_unified    = relmae(unified_prices, heston_prices)
+        relmae_param      = relmae(param_prices,   heston_prices)
+        relmae_unified_ft = relmae(unified_ft_prices, heston_prices) if unified_ft_prices is not None else float("nan")
 
         # ── Greeks（只对 T >= 0.05，ATM ±5% 合约）──
         greeks_row = {k: float("nan") for k in
                       ["delta_mae_unified", "gamma_mae_unified", "vega_mae_unified",
+                       "delta_mae_unified_ft", "gamma_mae_unified_ft", "vega_mae_unified_ft",
                        "delta_mae_parametric", "gamma_mae_parametric", "vega_mae_parametric"]}
 
         if T_val >= 0.05:
@@ -552,6 +567,19 @@ def eval_market():
                     kappa_h, theta_h, xi_h, rho_h, v0_h, K_REF=K_REF)
                     for K in Ks_atm]
 
+                # Unified FT Greeks
+                ft_greeks = None
+                if unified_ft is not None:
+                    def unified_ft_price_fn(S_ref, K_n, T, r, kappa, theta, xi, rho, v0):
+                        p = ModelParams.from_heston(K=K_n, T=max(T, 0.01), r=r,
+                                                   kappa=kappa, theta=theta,
+                                                   xi=xi, rho=rho, v0=v0)
+                        return unified_ft.price(p, S=S_ref) * scale
+                    ft_greeks = [_heston_greeks_pinn_fd(
+                        unified_ft_price_fn, S_spot, K, T_val, r_mkt,
+                        kappa_h, theta_h, xi_h, rho_h, v0_h, K_REF=K_REF)
+                        for K in Ks_atm]
+
                 greeks_row["delta_mae_unified"]    = _mae([g["delta"] for g in u_greeks],
                                                           [g["delta"] for g in ref_greeks])
                 greeks_row["gamma_mae_unified"]    = _mae([g["gamma"] for g in u_greeks],
@@ -564,12 +592,23 @@ def eval_market():
                                                           [g["gamma"] for g in ref_greeks])
                 greeks_row["vega_mae_parametric"]  = _mae([g["vega"]  for g in p_greeks],
                                                           [g["vega"]  for g in ref_greeks])
+                if ft_greeks is not None:
+                    greeks_row["delta_mae_unified_ft"] = _mae([g["delta"] for g in ft_greeks],
+                                                              [g["delta"] for g in ref_greeks])
+                    greeks_row["gamma_mae_unified_ft"] = _mae([g["gamma"] for g in ft_greeks],
+                                                              [g["gamma"] for g in ref_greeks])
+                    greeks_row["vega_mae_unified_ft"]  = _mae([g["vega"]  for g in ft_greeks],
+                                                              [g["vega"]  for g in ref_greeks])
 
                 # 累积 Greeks
                 for g_ref, g_u, g_p in zip(ref_greeks, u_greeks, p_greeks):
                     for key in ("delta", "gamma", "vega"):
                         acc["unified_v2"][key].append(abs(g_u[key] - g_ref[key]))
                         acc["parametric"][key].append(abs(g_p[key] - g_ref[key]))
+                if ft_greeks is not None and "unified_v2_ft" in acc:
+                    for g_ref, g_ft in zip(ref_greeks, ft_greeks):
+                        for key in ("delta", "gamma", "vega"):
+                            acc["unified_v2_ft"][key].append(abs(g_ft[key] - g_ref[key]))
 
         # 累积价格误差
         for K_idx, K in enumerate(Ks):
@@ -577,6 +616,8 @@ def eval_market():
             acc["heston_analytical"]["mae_mkt"].append(abs(heston_prices[K_idx] - calls[K_idx]))
             acc["unified_v2"]["mae_mkt"].append(abs(unified_prices[K_idx]    - calls[K_idx]))
             acc["parametric"]["mae_mkt"].append(abs(param_prices[K_idx]      - calls[K_idx]))
+            if unified_ft_prices is not None and "unified_v2_ft" in acc:
+                acc["unified_v2_ft"]["mae_mkt"].append(abs(unified_ft_prices[K_idx] - calls[K_idx]))
 
             h_ref = heston_prices[K_idx]
             if abs(h_ref) > 0.01:
@@ -587,6 +628,9 @@ def eval_market():
                 acc["bsm_analytical"]["relmae_heston"].append(
                     abs(bsm_prices[K_idx] - h_ref) / abs(h_ref))
                 acc["heston_analytical"]["relmae_heston"].append(0.0)
+                if unified_ft_prices is not None and "unified_v2_ft" in acc:
+                    acc["unified_v2_ft"]["relmae_heston"].append(
+                        abs(unified_ft_prices[K_idx] - h_ref) / abs(h_ref))
 
         rows_expiry.append({
             "expiry":                  str(exp_date),
@@ -601,8 +645,10 @@ def eval_market():
             "MAE_BSM":                 round(mae_bsm_mkt, 4),
             "MAE_Heston":              round(mae_heston_mkt, 4),
             "MAE_unified":             round(mae_unified_mkt, 4),
+            "MAE_unified_ft":          round(mae_unified_ft_mkt, 4) if not np.isnan(mae_unified_ft_mkt) else float("nan"),
             "MAE_parametric":          round(mae_param_mkt, 4),
-            "RelMAE_unified_vs_Heston":   round(relmae_unified, 4) if not np.isnan(relmae_unified) else float("nan"),
+            "RelMAE_unified_vs_Heston":    round(relmae_unified, 4) if not np.isnan(relmae_unified) else float("nan"),
+            "RelMAE_unified_ft_vs_Heston": round(relmae_unified_ft, 4) if not np.isnan(relmae_unified_ft) else float("nan"),
             "RelMAE_parametric_vs_Heston": round(relmae_param, 4) if not np.isnan(relmae_param) else float("nan"),
             **{k: (round(v, 6) if not np.isnan(v) else float("nan"))
                for k, v in greeks_row.items()},
@@ -614,7 +660,7 @@ def eval_market():
         return float(np.mean(arr)) if arr else float("nan")
 
     rows_summary = []
-    for model in ("bsm_analytical", "heston_analytical", "unified_v2", "parametric"):
+    for model in model_names:
         a = acc[model]
         rows_summary.append({
             "model":           model,
