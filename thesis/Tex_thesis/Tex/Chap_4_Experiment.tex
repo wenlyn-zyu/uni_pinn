@@ -107,7 +107,7 @@
   \end{tabular}
 \end{table}
 
-三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，统一框架在标准参数集下表现均衡。
+三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。
 
 \subsection{价格曲线对比}
 
@@ -145,7 +145,7 @@
 
 \section{消融实验}\label{sec:ablation}
 
-为验证各设计组件的必要性，本节进行消融实验，逐一去除统一框架的关键组件，观察对精度的影响。
+为验证各设计组件的必要性，本节进行消融实验，逐一去除多模型PINN方法的关键组件，观察对精度的影响。
 
 \subsection{软掩码的作用}
 
@@ -240,7 +240,7 @@
 
 \subsubsection{PINN-BSM的泛化能力}
 
-PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力。v16版本的BSM训练参数覆盖$\sigma\in[0.10,0.35]$，而真实市场的$\sigma^*$在0.13至0.25之间，恰好落在训练范围内，因此PINN-BSM能够精确复现校准BSM的定价结果，验证了统一框架的参数泛化性。
+PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力。v16版本的BSM训练参数覆盖$\sigma\in[0.10,0.35]$，而真实市场的$\sigma^*$在0.13至0.25之间，恰好落在训练范围内，因此PINN-BSM能够精确复现校准BSM的定价结果，验证了本文方法的参数泛化性。
 
 \subsubsection{参数化PINN的市场表现}
 
@@ -254,15 +254,15 @@ PINN-Heston的MAE显著高于校准Heston（高出5至73美元），这是本实
 
 \textbf{（2）价格尺度不匹配。}统一PINN以$S=100$为基准训练，真实SPY价格$S=739.75$，归一化后$K'=100\cdot K/739.75$，行权价范围约为$[85,115]$，与训练域一致。然而，Heston模型的价格对$v_0$（初始方差）极为敏感，而$v_0$的归一化处理（$v'=v/v_\text{max}$，$v_\text{max}=1$）在真实市场参数下可能引入额外误差。
 
-\textbf{（3）统一框架的容量瓶颈。}BSM仅有1个参数（$\sigma$），CEV有2个（$\sigma,\beta$），而Heston有5个（$\kappa,\theta,\xi,\rho,v_0$）。统一PINN用同一个6层128宽的网络同时拟合三种模型，Heston的高维参数空间对网络容量要求远高于BSM/CEV，是PINN-Heston泛化能力不足的根本原因。
+\textbf{（3）网络容量瓶颈。}BSM仅有1个参数（$\sigma$），CEV有2个（$\sigma,\beta$），而Heston有5个（$\kappa,\theta,\xi,\rho,v_0$）。统一PINN用同一个6层128宽的网络同时拟合三种模型，Heston的高维参数空间对网络容量要求远高于BSM/CEV，是PINN-Heston泛化能力不足的根本原因。
 
-上述分析表明，PINN-Heston在当前统一框架下存在根本性局限，需要从架构层面入手加以解决，留作未来工作（见第~\ref{sec:limitations}节）。
+上述分析表明，PINN-Heston在当前方法框架下存在根本性局限，需要从架构层面入手加以解决，留作未来工作（见第~\ref{sec:limitations}节）。
 
 
 
 \section{独立PINN与统一PINN精度对比}\label{sec:compare}
 
-为验证统一框架的有效性，本节在相同参数集下对比独立PINN、参数化PINN与统一PINN的定价精度。评估点取$S\in[50,250]$，共50个均匀采样点，$t=0$。所有方法使用统一参数集，如表~\ref{tab:compare_params}所示。
+为评估本文方法的有效性，本节在相同参数集下对比独立PINN、参数化PINN与统一PINN的定价精度。评估点取$S\in[50,250]$，共50个均匀采样点，$t=0$。所有方法使用统一参数集，如表~\ref{tab:compare_params}所示。
 
 \begin{table}[htbp]
   \centering

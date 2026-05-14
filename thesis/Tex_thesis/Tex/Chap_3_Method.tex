@@ -3,7 +3,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
-  \caption{统一期权定价框架系统架构。用户以自然语言输入期权需求，LLM路由层自动完成参数提取与模型选择，输出结构化JSON；统一PINN求解器接收参数向量$\boldsymbol{\lambda}=(\sigma,\beta,\kappa,\theta,\xi,\rho)$，基于软掩码机制和加法参数化输出，一次前向传播（$\sim$2ms）即可完成定价并输出Greeks。数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号。}
+  \caption{多模型期权定价系统架构。用户以自然语言输入期权需求，LLM路由层自动完成参数提取与模型选择，输出结构化JSON；统一PINN求解器接收参数向量$\boldsymbol{\lambda}=(\sigma,\beta,\kappa,\theta,\xi,\rho)$，基于软掩码机制和加法参数化输出，一次前向传播（$\sim$2ms）即可完成定价并输出Greeks。数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号。}
   \label{fig:architecture}
 \end{figure}
 
@@ -187,4 +187,4 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 \section{本章小结}\label{sec:method_summary}
 
-本章介绍了基于PINN与LLM的统一期权定价框架。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。
+本章介绍了基于PINN的多模型期权定价方法。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。

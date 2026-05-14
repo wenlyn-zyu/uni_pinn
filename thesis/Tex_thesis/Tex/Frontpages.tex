@@ -31,9 +31,9 @@
 \setcounter{page}{1}
 \pagenumbering{Roman}
 
-期权定价是金融工程的核心问题之一。Black-Scholes-Merton（BSM）模型、常弹性方差（Constant Elasticity of Variance，CEV）模型和Heston随机波动率模型是三大经典期权定价框架，分别适用于不同的市场假设。传统数值方法（有限差分、有限元）在求解高维偏微分方程（Partial Differential Equation，PDE）时面临维数灾难，而现有物理信息神经网络（Physics-Informed Neural Network，PINN）研究大多针对单一模型，缺乏统一框架。
+期权定价是金融工程的核心问题之一。Black-Scholes-Merton（BSM）模型、常弹性方差（Constant Elasticity of Variance，CEV）模型和Heston随机波动率模型是三大经典期权定价框架，分别适用于不同的市场假设。传统数值方法（有限差分、有限元）在求解高维偏微分方程（Partial Differential Equation，PDE）时面临维数灾难，而现有物理信息神经网络（Physics-Informed Neural Network，PINN）研究大多针对单一模型，缺乏多模型统一求解的方法。
 
-本文提出并实现了一个基于PINN与大语言模型（Large Language Model，LLM）的统一期权定价框架。在PINN部分，通过软掩码（Soft Mask）机制和加法参数化输出，将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，由一个9维输入的深层全连接网络同时覆盖三种模型的解映射，无需分别训练独立网络。软掩码通过$\tanh(\xi/0.05)^2$实现模型间的连续插值，当随机波动率参数$\xi\to 0$时自动退化为BSM/CEV，当$\xi$较大时激活Heston的随机波动率项。加法参数化以Black-Scholes解析解为基线，网络学习绝对修正量，解决了乘法参数化在深度虚值区域退化的问题。终值条件通过Black-Scholes公式的极限行为自然满足，无需额外约束项。
+本文研究基于PINN与大语言模型（Large Language Model，LLM）的多模型期权定价方法。在PINN部分，通过软掩码（Soft Mask）机制和加法参数化输出，将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，由一个9维输入的深层全连接网络同时覆盖三种模型的解映射，无需分别训练独立网络。软掩码通过$\tanh(\xi/0.05)^2$实现模型间的连续插值，当随机波动率参数$\xi\to 0$时自动退化为BSM/CEV，当$\xi$较大时激活Heston的随机波动率项。加法参数化以Black-Scholes解析解为基线，网络学习绝对修正量，解决了乘法参数化在深度虚值区域退化的问题。终值条件通过Black-Scholes公式的极限行为自然满足，无需额外约束项。
 
 在LLM部分，引入DeepSeek API作为智能路由层，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，使非专业用户无需了解模型细节即可完成期权定价。
 
