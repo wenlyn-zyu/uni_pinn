@@ -12,4 +12,5 @@ __pycache__/
 *.toc
 *.lof
 *.lot
-ppin/
+.claude/
+.DS_Store

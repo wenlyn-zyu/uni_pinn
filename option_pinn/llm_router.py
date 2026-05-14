@@ -80,15 +80,13 @@ def _format_occ_for_llm(occ: str) -> str:
     d = decode_occ_symbol(occ)
     return (
         f"OCC option code: {occ}\n"
-        f"FIXED (from OCC code, do NOT change): "
-        f"ticker={d['ticker']}, option_type={d['option_type']}, "
-        f"strike K={d['strike']}, expiry={d['expiry']}, "
-        f"T={d['T_approx']} years (today is {date.today().isoformat()}).\n"
-        f"YOU MUST use the K, T, and option_type values above exactly as given. "
-        f"Determine the spot price S for {d['ticker']} "
-        f"(use a reasonable recent price you know, otherwise default to 100), "
-        f"and fill any missing parameters. "
-        f"Use BSM model with sigma=0.2 unless the user specifies otherwise."
+        f"Decoded fields (LOCKED — output these exact values in JSON):\n"
+        f'  "option_type": "{d["option_type"]}"\n'
+        f'  "K": {d["strike"]}\n'
+        f'  "T": {d["T_approx"]}\n'
+        f"  (ticker={d['ticker']}, expiry={d['expiry']}, today={date.today().isoformat()})\n"
+        f"ONLY fill: S (spot price for {d['ticker']}, default 100 if unknown) "
+        f"and sigma (default 0.2). Use model=bsm unless user says otherwise."
     )
 
 SYSTEM_PROMPT = """You are an option pricing parameter extractor. Given a user's natural language description of an option, extract the pricing parameters and select the appropriate pricing model.
