@@ -7,7 +7,7 @@ import numpy as np
 import os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT  = os.path.join(HERE, "..", "thesis", "Tex_thesis", "Tex", "Img")
+OUT  = os.path.join(HERE, "..", "thesis", "Tex_thesis", "Img")
 os.makedirs(OUT, exist_ok=True)
 
 plt.rcParams.update({
