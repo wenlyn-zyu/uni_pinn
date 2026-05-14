@@ -116,6 +116,10 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
                       + w_\text{data}\,\mathcal{L}_\text{data}.
 \end{equation}
 
+\subsection{配点采样}\label{subsec:collocation}
+
+配点（collocation points）是PINN训练的核心数据来源，完全由求解域的几何结构决定，无需任何真实市场观测数据。具体地，对每个参数变体在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内均匀随机采样$N_c=5000$个配点$\{(S_i,v_i,t_i)\}_{i=1}^{N_c}$，其中$S_\text{max}=300$，$v_\text{max}=1$，$T=1$。每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。对于BSM/CEV模型，$v$维度退化为常数（$v=\sigma^2$），配点实际为二维；对于Heston模型，配点为完整三维。边界配点在各边界面上均匀采样$N_b=500$个点。数据锚点在$t=0$处取$N_d=20$个均匀分布的$S$值，对应价格由参考解析解预先计算（BSM用Black-Scholes公式，CEV用Schroder非中心卡方解析解，Heston用特征函数半解析解），这是训练中唯一涉及"真实"（解析）价格的部分。
+
 \subsection{PDE残差损失}
 
 在求解域内随机采样$N_c$个配点$\{(S_i,v_i,t_i)\}$，计算统一PDE算子的相对残差：
@@ -153,7 +157,7 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 训练时对54个参数变体（6 BSM + 12 CEV + 36 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
 
-使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{ic}, w_\text{data})=(1, 10, 10, 100)$。
+使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{data})=(1, 10, 100)$。
 
 \section{LLM路由层}\label{sec:llm_router}
 
