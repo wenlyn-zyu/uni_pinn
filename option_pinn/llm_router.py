@@ -254,11 +254,15 @@ class LLMRouter:
         """Send user input to DeepSeek and return parsed parameter dict.
 
         Automatically detects and decodes OCC option symbols before LLM call.
+        OCC-decoded K, T, option_type are force-overridden after LLM response
+        to guarantee correctness.
         Raises ValueError on JSON parse failure after retry.
         """
         # Preprocess: detect OCC symbol
         user_text = user_input.strip()
+        occ_decoded = None
         if is_occ_symbol(user_text):
+            occ_decoded = decode_occ_symbol(user_text)
             user_text = _format_occ_for_llm(user_text)
 
         messages = [
@@ -277,6 +281,11 @@ class LLMRouter:
                 )
                 raw = resp.choices[0].message.content.strip()
                 params = json.loads(raw)
+                # Force-override with OCC-decoded values
+                if occ_decoded:
+                    params["K"]           = occ_decoded["strike"]
+                    params["T"]           = occ_decoded["T_approx"]
+                    params["option_type"] = occ_decoded["option_type"]
                 return params
             except json.JSONDecodeError:
                 if attempt == 0 and retry:
