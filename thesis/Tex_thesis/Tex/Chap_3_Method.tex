@@ -3,7 +3,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
-  \caption{多模型期权定价系统架构。用户以自然语言输入期权需求，LLM路由层自动完成参数提取与模型选择，输出结构化JSON；统一PINN求解器接收参数向量$\boldsymbol{\lambda}=(\sigma,\beta,\kappa,\theta,\xi,\rho)$，基于软掩码机制和加法参数化输出，一次前向传播（$\sim$2ms）即可完成定价并输出Greeks。数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号。}
+  \caption{多模型期权定价系统架构（三层结构）。顶层（交互层）：用户以自然语言输入期权需求，LLM路由层完成参数提取与模型选择，输出结构化JSON；中层（求解层）：统一PINN求解器包含软掩码子模块（$\mathrm{mask}=\tanh^2(\xi/0.05)$，实现BSM/CEV与Heston之间的连续插值）和加法参数化子模块（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$），数据锚点（BSM解析解、CEV Schroder公式、Heston GL半解析解）在训练阶段提供监督信号；底层（输出层）：一次前向传播（$\sim$2ms）输出期权价格及Greeks。}
   \label{fig:architecture}
 \end{figure}
 
