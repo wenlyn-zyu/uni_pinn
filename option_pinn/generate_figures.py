@@ -1,4 +1,4 @@
-"""Generate thesis figures: soft mask, system architecture, LLM interaction."""
+"""Generate thesis figures: soft mask, system architecture."""
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -117,85 +117,8 @@ def fig_architecture():
     print("  architecture.pdf saved")
 
 
-# ── Figure 3: LLM Interaction Example ──────────────────────────────────────
-
-def fig_llm_interaction():
-    fig, ax = plt.subplots(figsize=(9, 6.5))
-    ax.set_xlim(0, 9)
-    ax.set_ylim(0, 6.5)
-    ax.axis('off')
-
-    # Title
-    ax.text(4.5, 6.2, 'LLM Routing Layer: Natural Language → Structured JSON',
-            ha='center', fontsize=14, weight='bold')
-
-    # User input box
-    user_text = (
-        "User Input:\n"
-        '"A 3-month European call option on SPY,\n'
-        ' strike $740, sigma around 0.18, use Heston.\n'
-        ' vol-of-vol is 0.3, correlation -0.7."'
-    )
-    ax.text(1.5, 5.0, user_text, fontsize=9, family='monospace',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='#F3E5F5', edgecolor='#7B1FA2'),
-            va='top')
-
-    # Arrow
-    ax.annotate('', xy=(5.5, 4.6), xytext=(3.5, 4.6),
-               arrowprops=dict(arrowstyle='->', color='#555', lw=2))
-
-    # LLM label
-    ax.text(4.5, 4.3, 'DeepSeek LLM', ha='center', fontsize=10, weight='bold',
-            color='#E65100')
-
-    # JSON output box
-    json_text = (
-        'LLM Output (JSON):\n'
-        '{\n'
-        '  "model":  "heston",\n'
-        '  "option_type": "call",\n'
-        '  "S": 740.0,  "K": 740.0,\n'
-        '  "T": 0.25,   "r": 0.043,\n'
-        '  "sigma": 0.18,   "beta": 1.0,\n'
-        '  "kappa": 2.0,    "theta": 0.04,\n'
-        '  "xi": 0.3,       "rho": -0.7,\n'
-        '  "v0": 0.04\n'
-        '}'
-    )
-    ax.text(4.5, 3.0, json_text, fontsize=8.5, family='monospace',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='#E8F5E9', edgecolor='#2E7D32'),
-            va='center', ha='center')
-
-    # Arrow to PINN
-    ax.annotate('', xy=(4.5, 1.8), xytext=(4.5, 2.2),
-               arrowprops=dict(arrowstyle='->', color='#1565C0', lw=2))
-
-    # PINN + Result
-    result_text = (
-        'Unified PINN → Option Price: $34.52\n'
-        'Greeks: Δ=0.582  Γ=0.0031  ν=127.4\n'
-        '(inference time: ~2 ms on GPU)'
-    )
-    ax.text(4.5, 1.3, result_text, fontsize=10, ha='center',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='#E3F2FD', edgecolor='#1565C0'),
-            va='center')
-
-    # Model selection logic note
-    note = (
-        'Model selection rules: σ only → BSM | β mentioned → CEV\n'
-        'κ,θ,ξ,ρ present → Heston | default → BSM with σ=0.2'
-    )
-    ax.text(4.5, 0.3, note, fontsize=8, ha='center', style='italic', color='#666')
-
-    fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "llm_interaction.pdf"), dpi=150, bbox_inches='tight')
-    plt.close()
-    print("  llm_interaction.pdf saved")
-
-
 if __name__ == "__main__":
     print("Generating thesis figures...")
     fig_soft_mask()
     fig_architecture()
-    fig_llm_interaction()
     print("Done. Output:", OUT)

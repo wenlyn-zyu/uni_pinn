@@ -44,9 +44,9 @@ cd option_pinn
 python unified_pinn_v2.py
 ```
 
-The script trains for 30,000 steps with 52 parameter variants (6 BSM + 12 CEV + 36 Heston). Checkpoint saved to `results/unified_v16_gl.pt`. Training takes ~30 min on a single GPU.
+The script trains for 30,000 steps with 54 parameter variants (6 BSM + 12 CEV + 36 Heston). Checkpoint saved to `results/unified_v16_gl.pt`. Training takes ~30 min on a single GPU.
 
-### Step 2 — Train independent baselines
+### Step 2 — Train independent baselines and parametric PINN
 
 ```bash
 # BSM and CEV (Dhiman & Hu 2023 gated network)
@@ -54,9 +54,12 @@ python independent/train_independent.py
 
 # Hainaut & Casas (2024) Heston parametric PINN
 python independent/heston_hainaut.py
+
+# Fully parametric PINN (all three models, wide parameter range)
+python parametric_pinn/train_parametric.py
 ```
 
-Checkpoints saved to `results/indep_bsm.pt`, `results/indep_cev.pt`, `results/hainaut.pt`.
+Checkpoints saved to `results/indep_bsm.pt`, `results/indep_cev.pt`, `results/hainaut.pt`, and `parametric_pinn/results/fully_param_v1.pt`.
 
 ### Step 3 — Run evaluation
 
@@ -108,9 +111,9 @@ Outputs PDF figures to `thesis/Tex_thesis/Tex/Img/`.
 
 | Model | MAE | RelMAE (ATM) |
 |-------|-----|--------------|
-| BSM | 0.0003 | 0.0010% |
+| BSM | 0.0005 | 0.0009% |
 | CEV (β=0.5, σ=0.20) | 0.032 | 0.79% |
-| Heston | 0.053 | 0.74% |
+| Heston | 0.102 | 0.60% |
 
 Inference: ~2 ms (GPU), ~8 ms (CPU). LLM routing: 100% accuracy on 20 test cases.
 

@@ -37,15 +37,15 @@ HESTON_UNIFIED = dict(kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04)
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 
-def _mse_relmse(pred, ref):
+def _mae_relmae(pred, ref):
     pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
-    mse    = float(np.mean((pred - ref) ** 2))
+    mae    = float(np.mean(np.abs(pred - ref)))
     mask   = np.abs(ref) > 0.01
     if mask.sum() == 0:
-        relmse = float("nan")
+        relmae = float("nan")
     else:
-        relmse = float(np.mean(((pred[mask] - ref[mask]) / np.abs(ref[mask])) ** 2))
-    return mse, relmse
+        relmae = float(np.mean(np.abs((pred[mask] - ref[mask]) / np.abs(ref[mask]))))
+    return mae, relmae
 
 
 def _atm_mask(S_arr, K, lo=0.8, hi=1.2):
@@ -54,21 +54,21 @@ def _atm_mask(S_arr, K, lo=0.8, hi=1.2):
     return (s_arr / K >= lo) & (s_arr / K <= hi)
 
 
-def _relmse_atm(pred, ref, S_arr, K=100.0):
-    """RelMSE restricted to ATM region (S/K ∈ [0.8, 1.2]) — robust for inter-model comparison."""
+def _relmae_atm(pred, ref, S_arr, K=100.0):
+    """RelMAE restricted to ATM region (S/K ∈ [0.8, 1.2]) — robust for inter-model comparison."""
     pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
     mask = _atm_mask(S_arr, K) & (np.abs(ref) > 0.01)
     if mask.sum() == 0:
         return float("nan")
-    return float(np.mean(((pred[mask] - ref[mask]) / np.abs(ref[mask])) ** 2))
+    return float(np.mean(np.abs((pred[mask] - ref[mask]) / np.abs(ref[mask]))))
 
 
 def _mae(pred, ref):
     return float(np.mean(np.abs(np.array(pred) - np.array(ref))))
 
 
-def _mse_relmse_otm(pred, ref, S_arr, K=K_SYN, threshold=0.85):
-    """MSE and RelMSE restricted to S/K >= threshold (exclude deep OTM calls).
+def _mae_relmae_otm(pred, ref, S_arr, K=K_SYN, threshold=0.85):
+    """MAE and RelMAE restricted to S/K >= threshold (exclude deep OTM calls).
 
     Deep OTM calls (S/K < 0.85) correspond to deep ITM puts; Hainaut prices
     puts via put-call parity, so large put values amplify conversion errors.
@@ -78,13 +78,13 @@ def _mse_relmse_otm(pred, ref, S_arr, K=K_SYN, threshold=0.85):
     pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
     otm_mask = np.array(S_arr) / K >= threshold
     pred, ref = pred[otm_mask], ref[otm_mask]
-    mse = float(np.mean((pred - ref) ** 2))
+    mae = float(np.mean(np.abs(pred - ref)))
     val_mask = np.abs(ref) > 0.01
     if val_mask.sum() == 0:
-        relmse = float("nan")
+        relmae = float("nan")
     else:
-        relmse = float(np.mean(((pred[val_mask] - ref[val_mask]) / np.abs(ref[val_mask])) ** 2))
-    return mse, relmse
+        relmae = float(np.mean(np.abs((pred[val_mask] - ref[val_mask]) / np.abs(ref[val_mask]))))
+    return mae, relmae
 
 
 # ── 模型加载 ──────────────────────────────────────────────────────────────────
@@ -262,10 +262,10 @@ def eval_synthetic():
                   is_hainaut=False):
         """Add one row to the price table.
 
-        MSE: full S range.
-        RelMSE: ATM only (S/K ∈ [0.8, 1.2]) for all models — robust against
+        MAE: full S range.
+        RelMAE: ATM only (S/K ∈ [0.8, 1.2]) for all models — robust against
                 deep-OTM denominator blow-up.  Consistent with thesis RelMAE_ATM.
-        Heston RelMSE: for Hainaut (put-call parity), uses S/K >= 0.85 filter
+        Heston RelMAE: for Hainaut (put-call parity), uses S/K >= 0.85 filter
                 to exclude deep-OTM CALL (deep-ITM PUT) where parity amplifies
                 conversion errors.
         ref_cev_target: the CEV reference matching the model's training sigma.
@@ -273,24 +273,24 @@ def eval_synthetic():
         pred_bsm  = np.maximum(np.array(pred_bsm, dtype=float), 0.0)
         pred_cev  = np.maximum(np.array(pred_cev, dtype=float), 0.0)
         pred_heston = np.maximum(np.array(pred_heston, dtype=float), 0.0)
-        bm = float(np.mean((pred_bsm - np.array(ref_bsm)) ** 2))
-        cm = float(np.mean((pred_cev - np.array(ref_cev_target)) ** 2))
-        hm = float(np.mean((pred_heston - np.array(ref_heston)) ** 2))
-        br = _relmse_atm(pred_bsm, ref_bsm, S_GRID, K_SYN)
-        cr = _relmse_atm(pred_cev, ref_cev_target, S_GRID, K_SYN)
+        bm = float(np.mean(np.abs(pred_bsm - np.array(ref_bsm))))
+        cm = float(np.mean(np.abs(pred_cev - np.array(ref_cev_target))))
+        hm = float(np.mean(np.abs(pred_heston - np.array(ref_heston))))
+        br = _relmae_atm(pred_bsm, ref_bsm, S_GRID, K_SYN)
+        cr = _relmae_atm(pred_cev, ref_cev_target, S_GRID, K_SYN)
         if is_hainaut:
-            _, hr = _mse_relmse_otm(pred_heston, ref_heston, S_GRID)
+            _, hr = _mae_relmae_otm(pred_heston, ref_heston, S_GRID)
         else:
-            hr = _relmse_atm(pred_heston, ref_heston, S_GRID, K_SYN)
+            hr = _relmae_atm(pred_heston, ref_heston, S_GRID, K_SYN)
         rows_price.append({
             "model": name,
-            "bsm_mse": bm, "bsm_relmse_atm": br,
-            "cev_mse": cm, "cev_relmse_atm": cr,
-            "heston_mse": hm, "heston_relmse_atm": hr,
+            "bsm_mae": bm, "bsm_relmae_atm": br,
+            "cev_mae": cm, "cev_relmae_atm": cr,
+            "heston_mae": hm, "heston_relmae_atm": hr,
         })
         tag = " [Heston S/K>=0.85, Hainaut]" if is_hainaut else ""
-        print(f"  {name:20s}  BSM RelMSE_ATM={br:.6f}  "
-              f"CEV RelMSE_ATM={cr:.6f}  Heston RelMSE_ATM={hr:.6f}{tag}")
+        print(f"  {name:20s}  BSM RelMAE_ATM={br:.6f}  "
+              f"CEV RelMAE_ATM={cr:.6f}  Heston RelMAE_ATM={hr:.6f}{tag}")
 
     def add_greeks(name, model_type, pred_g, ref_g):
         dm = _mae([g["delta"] for g in pred_g], [g["delta"] for g in ref_g])

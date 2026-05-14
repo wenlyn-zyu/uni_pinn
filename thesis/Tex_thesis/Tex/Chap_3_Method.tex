@@ -151,20 +151,13 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 \section{训练策略}\label{sec:training}
 
-训练时从三个模型的参数分布中混合采样配点：每个训练步骤中，从BSM、CEV、Heston三个模型各采样$N_c/3$个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
+训练时对54个参数变体（6 BSM + 12 CEV + 36 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
 
-使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。
+使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{ic}, w_\text{data})=(1, 10, 10, 100)$。
 
 \section{LLM路由层}\label{sec:llm_router}
 
 三种定价模型分别适用于不同的市场假设，传统工具要求用户手动指定模型类型和全部数值参数。本文引入DeepSeek LLM作为智能路由层，使用户可以通过自然语言描述期权需求，由LLM自动完成模型选择和参数提取。
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{Img/llm_interaction.pdf}
-  \caption{LLM路由层交互示例。用户以自然语言（中英文均可）描述期权需求，LLM通过结构化JSON输出提取全部数值参数并选择定价模型。模型选择遵循规则：仅提供$\sigma$则选BSM，提及$\beta$或CEV则选CEV，提供$\kappa,\theta,\xi,\rho$或提及Heston/随机波动率则选Heston，默认BSM。缺失参数自动填充典型默认值。参数经范围校验后传入统一PINN求解器，约2ms返回期权价格与Greeks。}
-  \label{fig:llm_interaction}
-\end{figure}
 
 系统提示词将LLM角色定义为"期权定价参数提取器"，规定模型选择规则：仅提供$\sigma$则选BSM，提及$\beta$或"CEV"则选CEV，提供$\kappa,\theta,\xi,\rho,v_0$或提及"Heston"/"stochastic volatility"则选Heston，默认BSM。对用户未提及的参数使用典型默认值（$S=100$，$K=100$，$T=1.0$，$r=0.05$，$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），并通过\texttt{response\_format: json\_object}强制输出合法JSON。LLM的输出遵循以下JSON Schema：
 \begin{verbatim}
@@ -183,6 +176,10 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
   P = C - S + Ke^{-r(T-t)}.
 \end{equation}
 完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；统一PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
+
+\section{参数化PINN对比方法}\label{sec:parametric_pinn}
+
+为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_\text{BS}(\sigma_\text{eff})+K\cdot\text{net}(x)$和软掩码机制。与统一PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为统一PINN的4倍）。实验结果见第~\ref{sec:compare}节。
 
 \section{本章小结}\label{sec:method_summary}
 
