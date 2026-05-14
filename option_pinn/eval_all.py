@@ -279,27 +279,42 @@ def eval_synthetic():
     print(f"Greeks 结果  → {os.path.join(out_dir, 'eval_greeks.csv')}")
 
 
+import re
+import datetime
+
 # ── 真实市场数据评估 ──────────────────────────────────────────────────────────
 
 def _load_spy(csv_path, moneyness_lo=0.7, moneyness_hi=1.3):
-    df = pd.read_csv(csv_path)
-    df.columns = [c.strip().lower() for c in df.columns]
-    # 适配 CBOE 列名
-    rename = {}
-    for col in df.columns:
-        if "underlying" in col and "last" in col:
-            rename[col] = "S"
-        elif col == "strike":
-            rename[col] = "K"
-        elif col in ("expiration", "expiry", "expire_date"):
-            rename[col] = "expiry"
-    df = df.rename(columns=rename)
+    """解析 CBOE 原始格式 CSV（前3行为元数据，第4行为列名，数据从第5行开始）。"""
+    with open(csv_path, encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+    # 从第2行提取当前股价
+    m = re.search(r"Last:\s*([\d.]+)", lines[1] if len(lines) > 1 else lines[0])
+    S_spot = float(m.group(1)) if m else None
+    # 解析数据行（跳过前4行：2行元数据+1空行+1列名行）
+    rows = []
+    today = datetime.date.today()
+    for line in lines[4:]:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(",")
+        if len(parts) < 12:
+            continue
+        try:
+            expiry_str = parts[0].strip()
+            bid  = float(parts[4]) if parts[4].strip() else float("nan")
+            ask  = float(parts[5]) if parts[5].strip() else float("nan")
+            K    = float(parts[11])
+            expiry_date = datetime.datetime.strptime(expiry_str, "%a %b %d %Y").date()
+            tau = (expiry_date - today).days / 365.0
+            rows.append({"S": S_spot, "K": K, "tau": tau,
+                         "bid": bid, "ask": ask})
+        except (ValueError, IndexError):
+            continue
+    df = pd.DataFrame(rows)
     df["mid"] = (df["bid"] + df["ask"]) / 2.0
     df = df[(df["bid"] > 0) & (df["ask"] > 0)]
-    df = df[df["type"].str.strip().str.lower() == "call"]
-    df["quote_date"] = pd.to_datetime(df["quote_date"])
-    df["expiry"]     = pd.to_datetime(df["expiry"])
-    df["tau"] = (df["expiry"] - df["quote_date"]).dt.days / 365.0
     df = df[df["tau"] > 0.05]
     df["moneyness"] = df["S"] / df["K"]
     df = df[(df["moneyness"] >= moneyness_lo) & (df["moneyness"] <= moneyness_hi)]
