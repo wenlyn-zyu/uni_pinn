@@ -80,15 +80,19 @@ def heston_call(S, K, T, r, kappa, theta, xi, rho, v0):
     return float(max(S*P1 - K*np.exp(-r*T)*P2, 0.0))
 
 
-def heston_greeks_fd(S, K, T, r, kappa, theta, xi, rho, v0, dS=0.5, dv=1e-3):
+def heston_greeks_fd(S, K, T, r, kappa, theta, xi, rho, v0, dS_frac=0.005):
     """Heston Delta, Gamma, Vega via central finite differences on GL prices."""
+    dS = S * dS_frac
+    dv = max(v0 * 0.05, 1e-4)
     p_up  = heston_call(S+dS, K, T, r, kappa, theta, xi, rho, v0)
     p_dn  = heston_call(S-dS, K, T, r, kappa, theta, xi, rho, v0)
     p_mid = heston_call(S,    K, T, r, kappa, theta, xi, rho, v0)
-    p_vup = heston_call(S, K, T, r, kappa, theta, xi, rho, v0+dv)
-    p_vdn = heston_call(S, K, T, r, kappa, theta, xi, rho, v0-dv)
+    v0_up = min(v0 + dv, 0.99)
+    v0_dn = max(v0 - dv, 1e-5)
+    p_vup = heston_call(S, K, T, r, kappa, theta, xi, rho, v0_up)
+    p_vdn = heston_call(S, K, T, r, kappa, theta, xi, rho, v0_dn)
     return {
         "delta": float((p_up - p_dn) / (2*dS)),
         "gamma": float((p_up - 2*p_mid + p_dn) / dS**2),
-        "vega":  float((p_vup - p_vdn) / (2*dv)),
+        "vega":  float((p_vup - p_vdn) / (v0_up - v0_dn)),
     }

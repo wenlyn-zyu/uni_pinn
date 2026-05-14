@@ -408,12 +408,14 @@ def _calibrate_heston(calls, S, Ks, T, r, sigma_bsm=0.2):
 
 def _heston_greeks_pinn_fd(price_fn, S_spot, K_mkt, T, r,
                             kappa, theta, xi, rho, v0,
-                            K_REF=100.0, dS_frac=0.005, dv=1e-3):
+                            K_REF=100.0, dS_frac=0.005):
     """用有限差分计算 PINN 的 Heston Greeks（Delta, Gamma, Vega）。
 
     price_fn(S_ref, K_n, T, r, kappa, theta, xi, rho, v0) -> 市场价格（已乘 scale）
+    Vega 用相对扰动，避免 v0 极小时数值不稳定。
     """
     dS = S_spot * dS_frac
+    dv = max(v0 * 0.05, 1e-4)  # 相对扰动 5%，最小 1e-4
 
     K_n_mid = K_REF * K_mkt / S_spot
     K_n_up  = K_REF * K_mkt / (S_spot + dS)
@@ -422,12 +424,14 @@ def _heston_greeks_pinn_fd(price_fn, S_spot, K_mkt, T, r,
     p_mid = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0)
     p_up  = price_fn(K_REF, K_n_up,  T, r, kappa, theta, xi, rho, v0)
     p_dn  = price_fn(K_REF, K_n_dn,  T, r, kappa, theta, xi, rho, v0)
-    p_vup = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0 + dv)
-    p_vdn = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0 - dv)
+    v0_up = min(v0 + dv, 0.99)
+    v0_dn = max(v0 - dv, 1e-5)
+    p_vup = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0_up)
+    p_vdn = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0_dn)
 
     delta = (p_up - p_dn) / (2.0 * dS)
     gamma = (p_up - 2.0 * p_mid + p_dn) / (dS ** 2)
-    vega  = (p_vup - p_vdn) / (2.0 * dv)
+    vega  = (p_vup - p_vdn) / (v0_up - v0_dn)
     return {"delta": float(delta), "gamma": float(gamma), "vega": float(vega)}
 
 
