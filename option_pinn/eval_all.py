@@ -12,7 +12,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
-from scipy.optimize import brentq
+from scipy.optimize import brentq, minimize
 
 sys.path.insert(0, os.path.dirname(__file__))
 from ref_solvers import (bsm_call, bsm_greeks,
@@ -309,7 +309,8 @@ def _load_spy(csv_path, moneyness_lo=0.7, moneyness_hi=1.3):
             expiry_date = datetime.datetime.strptime(expiry_str, "%a %b %d %Y").date()
             tau = (expiry_date - today).days / 365.0
             rows.append({"S": S_spot, "K": K, "tau": tau,
-                         "bid": bid, "ask": ask})
+                         "bid": bid, "ask": ask,
+                         "expiry_date": expiry_date})
         except (ValueError, IndexError):
             continue
     df = pd.DataFrame(rows)
@@ -333,74 +334,312 @@ def _bsm_iv(S, K, tau, r, mid):
         return 0.2
 
 
+def _calibrate_bsm_iv(calls, S, Ks, T, r):
+    """对一组合约计算 BSM 隐含波动率，返回有效 IV 的中位数。"""
+    ivs = []
+    for call, K in zip(calls, Ks):
+        iv = _bsm_iv(S, K, T, r, call)
+        if not np.isnan(iv) and iv > 0:
+            ivs.append(iv)
+    if len(ivs) == 0:
+        return 0.2
+    return float(np.median(ivs))
+
+
+def _calibrate_heston(calls, S, Ks, T, r, sigma_bsm=0.2):
+    """用 L-BFGS-B 多起点优化校准 Heston 参数，返回 (kappa, theta, xi, rho, v0)。"""
+    if T < 0.05:
+        v0_default = sigma_bsm ** 2
+        return (2.0, v0_default, 0.3, -0.7, v0_default)
+
+    calls = np.array(calls, dtype=float)
+    Ks    = np.array(Ks,    dtype=float)
+
+    # 若合约数 > 20，均匀采样 20 个
+    if len(calls) > 20:
+        idx   = np.round(np.linspace(0, len(calls) - 1, 20)).astype(int)
+        calls = calls[idx]
+        Ks    = Ks[idx]
+
+    weights = 1.0 / (calls + 0.5)
+
+    def objective(params):
+        kappa, theta, xi, rho, v0 = params
+        preds = np.array([
+            heston_call(S, K, T, r, kappa, theta, xi, rho, v0)
+            for K in Ks
+        ])
+        return float(np.sum(weights * (preds - calls) ** 2))
+
+    bounds = [
+        (0.05, 20.0),   # kappa
+        (0.001, 0.5),   # theta
+        (0.01, 2.5),    # xi
+        (-0.98, -0.01), # rho
+        (0.001, 0.5),   # v0
+    ]
+
+    starts = [
+        [2.0,  0.04,  0.3,  -0.7,  0.04],
+        [1.0,  0.02,  0.2,  -0.5,  0.02],
+        [5.0,  0.06,  0.5,  -0.8,  0.06],
+        [8.0,  0.04,  0.4,  -0.9,  0.04],
+        [0.5,  0.03,  0.1,  -0.6,  0.03],
+        [3.0,  0.05,  0.6,  -0.75, 0.05],
+        [10.0, 0.08,  0.8,  -0.85, 0.08],
+        [1.5,  0.025, 0.15, -0.55, 0.025],
+    ]
+
+    best_val    = float("inf")
+    best_params = starts[0]
+    for x0 in starts:
+        try:
+            res = minimize(objective, x0, method="L-BFGS-B", bounds=bounds,
+                           options={"maxiter": 200, "ftol": 1e-9})
+            if res.fun < best_val:
+                best_val    = res.fun
+                best_params = res.x.tolist()
+        except Exception:
+            continue
+
+    kappa, theta, xi, rho, v0 = best_params
+    return (float(kappa), float(theta), float(xi), float(rho), float(v0))
+
+
+def _heston_greeks_pinn_fd(price_fn, S_spot, K_mkt, T, r,
+                            kappa, theta, xi, rho, v0,
+                            K_REF=100.0, dS_frac=0.005, dv=1e-3):
+    """用有限差分计算 PINN 的 Heston Greeks（Delta, Gamma, Vega）。
+
+    price_fn(S_ref, K_n, T, r, kappa, theta, xi, rho, v0) -> 市场价格（已乘 scale）
+    """
+    dS = S_spot * dS_frac
+
+    K_n_mid = K_REF * K_mkt / S_spot
+    K_n_up  = K_REF * K_mkt / (S_spot + dS)
+    K_n_dn  = K_REF * K_mkt / (S_spot - dS)
+
+    p_mid = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0)
+    p_up  = price_fn(K_REF, K_n_up,  T, r, kappa, theta, xi, rho, v0)
+    p_dn  = price_fn(K_REF, K_n_dn,  T, r, kappa, theta, xi, rho, v0)
+    p_vup = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0 + dv)
+    p_vdn = price_fn(K_REF, K_n_mid, T, r, kappa, theta, xi, rho, v0 - dv)
+
+    delta = (p_up - p_dn) / (2.0 * dS)
+    gamma = (p_up - 2.0 * p_mid + p_dn) / (dS ** 2)
+    vega  = (p_vup - p_vdn) / (2.0 * dv)
+    return {"delta": float(delta), "gamma": float(gamma), "vega": float(vega)}
+
+
 def eval_market():
     print("=== 真实市场数据评估 ===")
     spy_csv = os.path.join(BASE, "data/spy_quotedata.csv")
     df = _load_spy(spy_csv)
     print(f"有效合约数: {len(df)}")
 
-    # 所有 PINN 模型用 moneyness 映射到训练域（K_SYN=100）
-    K_SYN = 100.0
-    df["S_scaled"] = df["S"] / df["K"] * K_SYN   # moneyness * 100
-    df["V_scaled"] = df["mid"] / df["K"] * K_SYN  # 价格按比例缩放
+    K_REF  = 100.0
+    r_mkt  = 0.043  # 市场无风险利率
 
-    df["iv"] = df.apply(
-        lambda row: _bsm_iv(row["S"], row["K"], row["tau"], 0.05, row["mid"]),
-        axis=1)
-
-    h = HESTON_UNIFIED
-    rows = []
-
-    def score(name, pred_fn):
-        preds = []
-        for _, row in df.iterrows():
-            try:
-                p = float(pred_fn(row))
-            except Exception:
-                p = float("nan")
-            preds.append(p)
-        preds = np.array(preds)
-        ref   = df["mid"].values
-        mask  = ~np.isnan(preds)
-        mse, relmse = _mse_relmse(preds[mask], ref[mask])
-        rows.append({"model": name, "mse": round(mse, 6),
-                     "relmse": round(relmse, 6), "n": int(mask.sum())})
-        print(f"  {name:20s}  MSE={mse:.4f}  RelMSE={relmse:.4f}  n={mask.sum()}")
-
-    # 解析解基准（直接用原始价格）
-    score("bsm_analytical",
-          lambda row: bsm_call(row["S"], row["K"], row["tau"], 0.05, row["iv"]))
-    score("heston_analytical",
-          lambda row: heston_call(row["S"], row["K"], row["tau"], 0.05, **h))
-
-    # 独立 PINN 不参与市场评估：它们是固定参数（K=100, T=1.0）的模型，
-    # 无法适应不同到期日的市场条件，误差无意义。
-
-    # Unified v2（moneyness 映射 + 反映射）
+    # 加载模型
     from unified_pinn_v2 import ModelParams
-    unified  = load_unified("unified_v16_gl.pt")
-    p_heston = ModelParams.from_heston(**h)
-    score("unified_v2",
-          lambda row: unified.price(p_heston, row["S_scaled"]) * row["K"] / K_SYN)
-
-    # Unified v2 fine-tuned
-    ft_ckpt = os.path.join(BASE, "results/unified_v2_ft.pt")
-    if os.path.exists(ft_ckpt):
-        unified_ft = load_unified("unified_v2_ft.pt")
-        score("unified_v2_ft",
-              lambda row: unified_ft.price(p_heston, row["S_scaled"]) * row["K"] / K_SYN)
-
-    # 参数化 PINN（moneyness 映射 + 反映射）
+    unified   = load_unified("unified_v16_gl.pt")
     param_pinn = load_parametric()
-    score("parametric",
-          lambda row: param_pinn.price(
-              S=row["S_scaled"], K=K_SYN, T=row["tau"], r=0.05,
-              kappa=h["kappa"], theta=h["theta"], xi=h["xi"], rho=h["rho"]
-          ) * row["K"] / K_SYN)
 
-    out_path = os.path.join(BASE, "results/eval_market.csv")
-    pd.DataFrame(rows).to_csv(out_path, index=False)
-    print(f"\n市场数据结果 → {out_path}")
+    S_spot = float(df["S"].iloc[0])
+    scale  = S_spot / K_REF
+
+    rows_expiry  = []  # 按到期日
+    # 汇总用累积列表
+    acc = {m: {"mae_mkt": [], "mae_heston": [], "relmae_heston": [],
+               "delta": [], "gamma": [], "vega": []}
+           for m in ("bsm_analytical", "heston_analytical", "unified_v2", "parametric")}
+
+    expiry_groups = list(df.groupby("expiry_date"))
+    print(f"到期日数: {len(expiry_groups)}")
+
+    for exp_date, grp in expiry_groups:
+        T_val = float(grp["tau"].iloc[0])
+        Ks    = grp["K"].values.astype(float)
+        calls = grp["mid"].values.astype(float)
+        n     = len(grp)
+
+        # ── 校准 ──
+        sigma_bsm = _calibrate_bsm_iv(calls, S_spot, Ks, T_val, r_mkt)
+        kappa_h, theta_h, xi_h, rho_h, v0_h = _calibrate_heston(
+            calls, S_spot, Ks, T_val, r_mkt, sigma_bsm)
+        print(f"  {exp_date}  T={T_val:.3f}  n={n}  "
+              f"sigma_bsm={sigma_bsm:.3f}  kappa={kappa_h:.2f}  "
+              f"theta={theta_h:.4f}  xi={xi_h:.3f}  rho={rho_h:.3f}  v0={v0_h:.4f}")
+
+        # ── 解析解 ──
+        bsm_prices    = np.array([bsm_call(S_spot, K, T_val, r_mkt, sigma_bsm) for K in Ks])
+        heston_prices = np.array([heston_call(S_spot, K, T_val, r_mkt,
+                                              kappa_h, theta_h, xi_h, rho_h, v0_h)
+                                  for K in Ks])
+
+        # ── Unified PINN（per-contract ModelParams）──
+        unified_prices = []
+        for K in Ks:
+            K_n = K_REF * K / S_spot
+            p = ModelParams.from_heston(K=K_n, T=max(T_val, 0.01), r=r_mkt,
+                                        kappa=kappa_h, theta=theta_h,
+                                        xi=xi_h, rho=rho_h, v0=v0_h)
+            unified_prices.append(unified.price(p, S=K_REF) * scale)
+        unified_prices = np.array(unified_prices)
+
+        # ── 参数化 PINN（per-contract）──
+        param_prices = []
+        for K in Ks:
+            K_n = K_REF * K / S_spot
+            param_prices.append(param_pinn.price(
+                S=K_REF, K=K_n, T=max(T_val, 0.01), r=r_mkt,
+                kappa=kappa_h, theta=theta_h, xi=xi_h, rho=rho_h, v0=v0_h
+            ) * scale)
+        param_prices = np.array(param_prices)
+
+        # ── MAE vs 市场 ──
+        mae_bsm_mkt     = _mae(bsm_prices,    calls)
+        mae_heston_mkt  = _mae(heston_prices,  calls)
+        mae_unified_mkt = _mae(unified_prices, calls)
+        mae_param_mkt   = _mae(param_prices,   calls)
+
+        # ── RelMAE vs Heston 解析解 ──
+        def relmae(pred, ref):
+            mask = np.abs(ref) > 0.01
+            if mask.sum() == 0:
+                return float("nan")
+            return float(np.mean(np.abs((pred[mask] - ref[mask]) / np.abs(ref[mask]))))
+
+        relmae_unified = relmae(unified_prices, heston_prices)
+        relmae_param   = relmae(param_prices,   heston_prices)
+
+        # ── Greeks（只对 T >= 0.05，ATM ±5% 合约）──
+        greeks_row = {k: float("nan") for k in
+                      ["delta_mae_unified", "gamma_mae_unified", "vega_mae_unified",
+                       "delta_mae_parametric", "gamma_mae_parametric", "vega_mae_parametric"]}
+
+        if T_val >= 0.05:
+            atm_mask = np.abs(Ks / S_spot - 1.0) <= 0.05
+            if atm_mask.sum() >= 1:
+                Ks_atm    = Ks[atm_mask]
+                calls_atm = calls[atm_mask]
+
+                # 参考 Greeks（Heston 解析解有限差分）
+                ref_greeks = [heston_greeks_fd(S_spot, K, T_val, r_mkt,
+                                               kappa_h, theta_h, xi_h, rho_h, v0_h)
+                              for K in Ks_atm]
+
+                # Unified PINN Greeks
+                def unified_price_fn(S_ref, K_n, T, r, kappa, theta, xi, rho, v0):
+                    p = ModelParams.from_heston(K=K_n, T=max(T, 0.01), r=r,
+                                               kappa=kappa, theta=theta,
+                                               xi=xi, rho=rho, v0=v0)
+                    return unified.price(p, S=S_ref) * scale
+
+                # Parametric PINN Greeks
+                def param_price_fn(S_ref, K_n, T, r, kappa, theta, xi, rho, v0):
+                    return param_pinn.price(
+                        S=S_ref, K=K_n, T=max(T, 0.01), r=r,
+                        kappa=kappa, theta=theta, xi=xi, rho=rho, v0=v0
+                    ) * scale
+
+                u_greeks = [_heston_greeks_pinn_fd(
+                    unified_price_fn, S_spot, K, T_val, r_mkt,
+                    kappa_h, theta_h, xi_h, rho_h, v0_h, K_REF=K_REF)
+                    for K in Ks_atm]
+                p_greeks = [_heston_greeks_pinn_fd(
+                    param_price_fn, S_spot, K, T_val, r_mkt,
+                    kappa_h, theta_h, xi_h, rho_h, v0_h, K_REF=K_REF)
+                    for K in Ks_atm]
+
+                greeks_row["delta_mae_unified"]    = _mae([g["delta"] for g in u_greeks],
+                                                          [g["delta"] for g in ref_greeks])
+                greeks_row["gamma_mae_unified"]    = _mae([g["gamma"] for g in u_greeks],
+                                                          [g["gamma"] for g in ref_greeks])
+                greeks_row["vega_mae_unified"]     = _mae([g["vega"]  for g in u_greeks],
+                                                          [g["vega"]  for g in ref_greeks])
+                greeks_row["delta_mae_parametric"] = _mae([g["delta"] for g in p_greeks],
+                                                          [g["delta"] for g in ref_greeks])
+                greeks_row["gamma_mae_parametric"] = _mae([g["gamma"] for g in p_greeks],
+                                                          [g["gamma"] for g in ref_greeks])
+                greeks_row["vega_mae_parametric"]  = _mae([g["vega"]  for g in p_greeks],
+                                                          [g["vega"]  for g in ref_greeks])
+
+                # 累积 Greeks
+                for g_ref, g_u, g_p in zip(ref_greeks, u_greeks, p_greeks):
+                    for key in ("delta", "gamma", "vega"):
+                        acc["unified_v2"][key].append(abs(g_u[key] - g_ref[key]))
+                        acc["parametric"][key].append(abs(g_p[key] - g_ref[key]))
+
+        # 累积价格误差
+        for K_idx, K in enumerate(Ks):
+            acc["bsm_analytical"]["mae_mkt"].append(abs(bsm_prices[K_idx]    - calls[K_idx]))
+            acc["heston_analytical"]["mae_mkt"].append(abs(heston_prices[K_idx] - calls[K_idx]))
+            acc["unified_v2"]["mae_mkt"].append(abs(unified_prices[K_idx]    - calls[K_idx]))
+            acc["parametric"]["mae_mkt"].append(abs(param_prices[K_idx]      - calls[K_idx]))
+
+            h_ref = heston_prices[K_idx]
+            if abs(h_ref) > 0.01:
+                acc["unified_v2"]["relmae_heston"].append(
+                    abs(unified_prices[K_idx] - h_ref) / abs(h_ref))
+                acc["parametric"]["relmae_heston"].append(
+                    abs(param_prices[K_idx] - h_ref) / abs(h_ref))
+                acc["bsm_analytical"]["relmae_heston"].append(
+                    abs(bsm_prices[K_idx] - h_ref) / abs(h_ref))
+                acc["heston_analytical"]["relmae_heston"].append(0.0)
+
+        rows_expiry.append({
+            "expiry":                  str(exp_date),
+            "T_years":                 round(T_val, 4),
+            "n":                       n,
+            "sigma_bsm":               round(sigma_bsm, 4),
+            "kappa_h":                 round(kappa_h, 4),
+            "theta_h":                 round(theta_h, 4),
+            "xi_h":                    round(xi_h, 4),
+            "rho_h":                   round(rho_h, 4),
+            "v0_h":                    round(v0_h, 4),
+            "MAE_BSM":                 round(mae_bsm_mkt, 4),
+            "MAE_Heston":              round(mae_heston_mkt, 4),
+            "MAE_unified":             round(mae_unified_mkt, 4),
+            "MAE_parametric":          round(mae_param_mkt, 4),
+            "RelMAE_unified_vs_Heston":   round(relmae_unified, 4) if not np.isnan(relmae_unified) else float("nan"),
+            "RelMAE_parametric_vs_Heston": round(relmae_param, 4) if not np.isnan(relmae_param) else float("nan"),
+            **{k: (round(v, 6) if not np.isnan(v) else float("nan"))
+               for k, v in greeks_row.items()},
+        })
+
+    # ── 全局汇总 ──
+    def safe_mean(lst):
+        arr = [x for x in lst if not np.isnan(x)]
+        return float(np.mean(arr)) if arr else float("nan")
+
+    rows_summary = []
+    for model in ("bsm_analytical", "heston_analytical", "unified_v2", "parametric"):
+        a = acc[model]
+        rows_summary.append({
+            "model":           model,
+            "MAE_vs_market":   round(safe_mean(a["mae_mkt"]), 4),
+            "RelMAE_vs_Heston": round(safe_mean(a["relmae_heston"]), 4),
+            "delta_mae":       round(safe_mean(a["delta"]), 6),
+            "gamma_mae":       round(safe_mean(a["gamma"]), 6),
+            "vega_mae":        round(safe_mean(a["vega"]), 6),
+            "n_expiries":      len(expiry_groups),
+        })
+
+    print("\n=== 全局汇总 ===")
+    for r in rows_summary:
+        print(f"  {r['model']:22s}  MAE_mkt={r['MAE_vs_market']:.4f}  "
+              f"RelMAE_Heston={r['RelMAE_vs_Heston']:.4f}  "
+              f"delta_mae={r['delta_mae']:.4f}  vega_mae={r['vega_mae']:.4f}")
+
+    out_dir = os.path.join(BASE, "results")
+    os.makedirs(out_dir, exist_ok=True)
+    pd.DataFrame(rows_expiry).to_csv(
+        os.path.join(out_dir, "eval_market.csv"), index=False)
+    pd.DataFrame(rows_summary).to_csv(
+        os.path.join(out_dir, "eval_market_summary.csv"), index=False)
+    print(f"\n按到期日结果 → {os.path.join(out_dir, 'eval_market.csv')}")
+    print(f"全局汇总     → {os.path.join(out_dir, 'eval_market_summary.csv')}")
 
 
 # ── 入口 ──────────────────────────────────────────────────────────────────────
