@@ -317,12 +317,12 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
   \label{fig:compare}
 \end{figure}
 
-\section{希腊字母计算}\label{sec:greeks}
+\section{Greeks计算}\label{sec:greeks}
 
-PINN的一个重要优势是可通过自动微分直接计算希腊字母，无需额外推导。
+PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额外推导。
 本节验证统一PINN计算的Delta、Gamma、Vega与解析/有限差分参考值的一致性。
 
-\subsection{BSM希腊字母}
+\subsection{BSM Greeks}
 
 对BSM模型，Delta和Gamma通过对$S$的自动微分计算，Vega通过对$\sigma$的有限差分计算（步长$h=0.001$）。
 参考值为Black-Scholes解析公式。
@@ -330,11 +330,11 @@ PINN的一个重要优势是可通过自动微分直接计算希腊字母，无�
 
 \begin{table}[htbp]
   \centering
-  \caption{BSM希腊字母精度（统一PINN vs 解析解，平均相对误差）}
+  \caption{BSM Greeks精度（统一PINN vs 解析解，平均相对误差）}
   \label{tab:greeks_bsm}
   \begin{tabular}{lccc}
     \hline
-    希腊字母 & 平均相对误差 & 最大相对误差 & 评估点数 \\
+    Greeks & 平均相对误差 & 最大相对误差 & 评估点数 \\
     \hline
     Delta & 0.03\% & 0.05\% & 12 \\
     Gamma & 0.13\% & 0.28\% & 12 \\
@@ -343,21 +343,21 @@ PINN的一个重要优势是可通过自动微分直接计算希腊字母，无�
   \end{tabular}
 \end{table}
 
-BSM希腊字母的平均相对误差均低于0.2\%，表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
+BSM Greeks的平均相对误差均低于0.2\%，表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
 
-\subsection{Heston希腊字母}
+\subsection{Heston Greeks}
 
-Heston模型无简单解析希腊字母，参考值通过对GL半解析价格的中心有限差分计算。
+Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心有限差分计算。
 Delta和Gamma对$S$差分，Vega对$v_0$差分。
 评估参数：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。
 
 \begin{table}[htbp]
   \centering
-  \caption{Heston希腊字母精度（统一PINN vs 有限差分参考解，平均相对误差）}
+  \caption{Heston Greeks精度（统一PINN vs 有限差分参考解，平均相对误差）}
   \label{tab:greeks_heston}
   \begin{tabular}{lcc}
     \hline
-    希腊字母 & 平均相对误差 & 说明 \\
+    Greeks & 平均相对误差 & 说明 \\
     \hline
     Delta & 1.83\%  & 跨4组参数集平均 \\
     Gamma & 11.41\% & 高$\kappa$、高$\xi$区域误差较大 \\
