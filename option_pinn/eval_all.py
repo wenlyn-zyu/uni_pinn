@@ -42,7 +42,12 @@ HESTON_UNIFIED = dict(kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04)
 def _mse_relmse(pred, ref):
     pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
     mse    = float(np.mean((pred - ref) ** 2))
-    relmse = float(np.mean(((pred - ref) / (np.abs(ref) + 1e-8)) ** 2))
+    # 只在参考解足够大时计算相对误差（避免深度虚值时分母趋零）
+    mask   = np.abs(ref) > 0.01
+    if mask.sum() == 0:
+        relmse = float("nan")
+    else:
+        relmse = float(np.mean(((pred[mask] - ref[mask]) / np.abs(ref[mask])) ** 2))
     return mse, relmse
 
 
