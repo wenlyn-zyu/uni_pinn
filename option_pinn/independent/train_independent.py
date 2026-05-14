@@ -1,11 +1,13 @@
 """
-Train independent PINN models (BSM, CEV, Heston) and save checkpoints.
+Train independent PINN models (BSM, CEV) and save checkpoints.
 
 Usage:
   python independent/train_independent.py              # train all
   python independent/train_independent.py --model bsm  # train BSM only
   python independent/train_independent.py --model cev
-  python independent/train_independent.py --model heston
+
+Note: The Heston independent baseline (Hainaut & Casas 2024) is trained
+separately via its own script (heston_hainaut.py).
 
 Checkpoints are saved to results/ directory.
 """
@@ -13,7 +15,6 @@ Checkpoints are saved to results/ directory.
 import os
 import sys
 
-# Allow running from project root or from independent/ directory
 _here = os.path.dirname(os.path.abspath(__file__))
 _root = os.path.dirname(_here)
 if _root not in sys.path:
@@ -21,7 +22,6 @@ if _root not in sys.path:
 
 from independent.bsm_pinn import BSM_PINN
 from independent.cev_pinn import CEV_PINN
-from independent.heston_pinn import Heston_PINN
 
 CKPT_DIR = os.path.join(_root, "results")
 os.makedirs(CKPT_DIR, exist_ok=True)
@@ -51,27 +51,10 @@ def train_cev():
     return model
 
 
-def train_heston():
-    print("=" * 60)
-    print("Training Heston-PINN (with GL data anchors)")
-    print("  kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04")
-    print("  K=100, T=1, r=0.05")
-    print("=" * 60)
-    model = Heston_PINN(
-        K=100, T=1.0, r=0.05,
-        kappa=2.0, theta=0.04, xi=0.3, rho=-0.7, v0=0.04,
-        S_max=300, v_max=1.0,
-    )
-    model.train(epochs=30000, log_every=2000)
-    model.save(os.path.join(CKPT_DIR, "indep_heston.pt"))
-    print("Heston checkpoint saved to results/indep_heston.pt\n")
-    return model
-
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Train independent PINN models")
-    parser.add_argument("--model", choices=["bsm", "cev", "heston", "all"],
+    parser.add_argument("--model", choices=["bsm", "cev", "all"],
                         default="all", help="Which model to train")
     args = parser.parse_args()
 
@@ -79,5 +62,3 @@ if __name__ == "__main__":
         train_bsm()
     if args.model in ("cev", "all"):
         train_cev()
-    if args.model in ("heston", "all"):
-        train_heston()
