@@ -373,16 +373,8 @@ def eval_market():
     score("heston_analytical",
           lambda row: heston_call(row["S"], row["K"], row["tau"], 0.05, **h))
 
-    # 独立 PINN（moneyness 映射 + 反映射）
-    bsm_pinn    = load_indep_bsm()
-    cev_pinn    = load_indep_cev()
-    heston_pinn = load_indep_heston()
-    score("indep_bsm",
-          lambda row: bsm_pinn.price(row["S_scaled"]) / bsm_pinn.K * row["K"] / K_SYN)
-    score("indep_cev",
-          lambda row: cev_pinn.price(row["S_scaled"]) * row["K"] / K_SYN)
-    score("indep_heston",
-          lambda row: heston_pinn.price(row["S_scaled"]) * row["K"] / K_SYN)
+    # 独立 PINN 不参与市场评估：它们是固定参数（K=100, T=1.0）的模型，
+    # 无法适应不同到期日的市场条件，误差无意义。
 
     # Unified v2（moneyness 映射 + 反映射）
     from unified_pinn_v2 import ModelParams
