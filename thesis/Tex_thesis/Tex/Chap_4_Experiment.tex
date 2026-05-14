@@ -122,18 +122,6 @@
 
 从价格曲线可以观察到：BSM的PINN预测与解析解高度吻合，误差主要集中在深度虚值区域（$S<70$）；CEV的PINN预测整体趋势正确，但在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，这与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域（$S>140$）。
 
-\subsection{误差分布分析}
-
-图~\ref{fig:error_dist}展示了三大模型的绝对误差随股价$S$的分布。
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{Img/error_dist.pdf}
-  \caption{三大模型绝对误差分布（$t=0$，$S\in[50,250]$）。绿色阴影区域为ATM区间（$S\in[80,120]$），该区域误差最小；深度虚值（$S<70$）和深度实值（$S>140$）区域误差相对较大。}
-  \label{fig:error_dist}
-\end{figure}
-
-误差分布呈现出典型的"U形"特征：ATM区域误差最小，深度虚值和深度实值区域误差较大。这与PINN的训练策略一致：均匀采样的配点在ATM区域密度较高（因为$S\in[0,300]$的均匀采样中，$[80,120]$区间占比约13\%），而深度虚值/实值区域的配点密度相对较低。
 
 \section{推断速度}\label{sec:speed}
 

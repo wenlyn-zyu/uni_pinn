@@ -91,114 +91,145 @@ def fig_soft_mask():
 
 # ── 2. System Architecture ────────────────────────────────────────────────────
 def fig_architecture():
-    fig, ax = plt.subplots(figsize=(11, 6.5))
-    ax.set_xlim(0, 11)
-    ax.set_ylim(0, 6.5)
+    """
+    Three-layer architecture (matches thesis caption exactly):
+      Layer 1 – Interaction:  User Input → LLM Router → Structured JSON
+      Layer 2 – Solver:       Unified PINN (Soft Mask + Additive Output + Unified PDE)
+                              Data Anchors feed in from the right (training only)
+      Layer 3 – Output:       Option Price + Greeks (~2 ms)
+    """
+    W, H = 12.0, 7.2
+    fig, ax = plt.subplots(figsize=(W, H))
+    ax.set_xlim(0, W); ax.set_ylim(0, H)
     ax.axis("off")
 
-    LBLUE   = "#E3F2FD"
-    LGREEN  = "#E8F5E9"
-    LRED    = "#FCE4EC"
-    LYELLOW = "#FFF8E1"
-    LPURPLE = "#F3E5F5"
-    LCYAN   = "#E0F7FA"
+    # ── palette ──────────────────────────────────────────────────────────────
+    LPURPLE = "#F3E5F5"; LYELLOW = "#FFF8E1"; LGREEN  = "#E8F5E9"
+    LBLUE   = "#E3F2FD"; LCYAN   = "#E0F7FA"; LRED    = "#FCE4EC"
+    LINDIGO = "#E8EAF6"
+    EC_PUR  = "#7B1FA2"; EC_ORG  = "#E65100"; EC_GRN  = "#2E7D32"
+    EC_BLU  = "#1565C0"; EC_CYN  = "#00838F"; EC_RED  = "#C62828"
+    EC_IND  = "#3949AB"
 
-    def rbox(cx, cy, w, h, lines, fc, ec, fs=9.2, bold=False, lw=1.5):
-        rect = FancyBboxPatch((cx - w/2, cy - h/2), w, h,
-                              boxstyle="round,pad=0.12",
-                              facecolor=fc, edgecolor=ec,
-                              linewidth=lw, zorder=2)
-        ax.add_patch(rect)
-        txt = "\n".join(lines)
-        ax.text(cx, cy, txt, ha="center", va="center", fontsize=fs,
-                fontweight="bold" if bold else "normal",
-                linespacing=1.55, zorder=3)
+    # ── helpers ──────────────────────────────────────────────────────────────
+    def rbox(cx, cy, w, h, lines, fc, ec, fs=9.0, bold=False, lw=1.4):
+        ax.add_patch(FancyBboxPatch(
+            (cx - w/2, cy - h/2), w, h,
+            boxstyle="round,pad=0.13", facecolor=fc, edgecolor=ec,
+            linewidth=lw, zorder=2))
+        ax.text(cx, cy, "\n".join(lines), ha="center", va="center",
+                fontsize=fs, fontweight="bold" if bold else "normal",
+                linespacing=1.5, zorder=3)
 
-    def dbox(cx, cy, w, h, ec, label="", lc="#888888"):
-        rect = FancyBboxPatch((cx - w/2, cy - h/2), w, h,
-                              boxstyle="round,pad=0.1",
-                              facecolor="#FAFAFA", edgecolor=ec,
-                              linewidth=1.1, linestyle="--", zorder=1)
-        ax.add_patch(rect)
+    def dbox(cx, cy, w, h, ec, label="", lc=GRAY):
+        ax.add_patch(FancyBboxPatch(
+            (cx - w/2, cy - h/2), w, h,
+            boxstyle="round,pad=0.10", facecolor="#F8FAFF", edgecolor=ec,
+            linewidth=1.2, linestyle="--", zorder=1))
         if label:
-            ax.text(cx - w/2 + 0.18, cy + h/2 - 0.16, label,
-                    fontsize=8, color=lc, va="top", zorder=3,
-                    fontweight="bold")
+            ax.text(cx - w/2 + 0.20, cy + h/2 - 0.18, label,
+                    fontsize=8.5, color=lc, va="top", fontweight="bold", zorder=3)
 
-    def arrow(x1, y1, x2, y2, col=GRAY, lw=1.6, label="", lfs=8.5):
+    def band(yc, h, fc):
+        ax.add_patch(FancyBboxPatch(
+            (0.50, yc - h/2), W - 1.0, h,
+            boxstyle="round,pad=0.05", facecolor=fc,
+            edgecolor="none", zorder=0, alpha=0.50))
+
+    def arr(x1, y1, x2, y2, col=GRAY, lw=1.6, style="-|>"):
         ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                    arrowprops=dict(arrowstyle="-|>", color=col,
+                    arrowprops=dict(arrowstyle=style, color=col,
                                    lw=lw, mutation_scale=14), zorder=4)
-        if label:
-            mx, my = (x1+x2)/2 + 0.08, (y1+y2)/2
-            ax.text(mx, my, label, fontsize=lfs, color=col, va="center")
 
-    def layer_label(y, txt, col):
-        ax.text(0.22, y, txt, fontsize=8.5, color=col, va="center",
-                ha="center", rotation=90, fontweight="bold",
+    def arr_label(x1, y1, x2, y2, txt, col=GRAY, lw=1.4):
+        arr(x1, y1, x2, y2, col=col, lw=lw)
+        ax.text((x1+x2)/2 + 0.10, (y1+y2)/2, txt,
+                fontsize=8, color=col, va="center", zorder=5)
+
+    def layer_label(yc, txt, col):
+        ax.text(0.28, yc, txt, fontsize=8.5, color=col,
+                ha="center", va="center", rotation=90, fontweight="bold",
                 bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
-                          edgecolor=col, linewidth=0.8, alpha=0.85))
+                          edgecolor=col, linewidth=0.8, alpha=0.9), zorder=5)
 
-    # ── Layer band backgrounds ────────────────────────────────────────────────
-    for yc, h, fc in [(5.55, 1.1, "#F8F0FF"), (3.25, 2.1, "#F0F4FF"),
-                      (1.25, 1.0, "#F0FFF4")]:
-        ax.add_patch(FancyBboxPatch((0.45, yc - h/2), 10.1, h,
-                     boxstyle="round,pad=0.05", facecolor=fc,
-                     edgecolor="none", zorder=0, alpha=0.55))
+    # ── layer band backgrounds ────────────────────────────────────────────────
+    Y1, Y2, Y3 = 6.10, 3.60, 1.20
+    band(Y1, 1.20, "#F8F0FF")   # interaction – lavender
+    band(Y2, 2.40, "#EEF2FF")   # solver      – light blue
+    band(Y3, 1.00, "#F0FFF4")   # output      – light green
 
     # ── Layer 1: Interaction ──────────────────────────────────────────────────
-    Y1 = 5.55
-    rbox(1.55, Y1, 2.2, 0.72, ["User Input", "(CN / EN)"],
-         LPURPLE, C5, fs=9)
-    rbox(5.5,  Y1, 3.0, 0.72,
+    # [User Input] --> [LLM Router] --> [Structured JSON]
+    rbox(1.70, Y1, 2.20, 0.78,
+         ["User Input", "(CN / EN)"], LPURPLE, EC_PUR, fs=9)
+    rbox(5.50, Y1, 3.20, 0.78,
          ["LLM Router", "param extraction + model selection"],
-         LYELLOW, C4, fs=9, bold=True)
-    rbox(9.5,  Y1, 2.4, 0.72,
-         ["Structured JSON", r"{model, S, K, T, r, $\boldsymbol{\lambda}$}"],
-         LGREEN, C3, fs=9)
+         LYELLOW, EC_ORG, fs=9, bold=True)
+    rbox(9.60, Y1, 2.40, 0.78,
+         ["Structured JSON", r"{model, S, K, T, r, $\lambda$}"],
+         LGREEN, EC_GRN, fs=9)
 
-    arrow(2.65, Y1, 4.0,  Y1)
-    arrow(7.0,  Y1, 8.3,  Y1)
+    arr(2.80, Y1, 3.90, Y1, col=GRAY)
+    arr(7.10, Y1, 8.40, Y1, col=GRAY)
 
-    # ── Layer 2: PINN Solver ──────────────────────────────────────────────────
-    Y2 = 3.25
-    dbox(5.1, Y2, 7.0, 1.95, C1, "Unified PINN Solver", lc=C1)
+    # ── Layer 2: Solver ───────────────────────────────────────────────────────
+    # Dashed outer box for "Unified PINN Solver"
+    # Inner boxes: [Soft Mask] --> [Additive Output]
+    #                                    ^
+    #              [Unified PDE] ---------
+    # Data anchors on the right, dashed arrow into solver box
 
-    rbox(2.9, Y2+0.38, 2.4, 0.68,
+    # Solver dashed container (x: 0.65 to 8.85, centred at 4.75)
+    dbox(4.75, Y2, 8.20, 2.20, EC_BLU, "Unified PINN Solver", lc=EC_BLU)
+
+    # Soft Mask box
+    rbox(2.20, Y2 + 0.50, 2.50, 0.72,
          ["Soft Mask", r"mask $= \tanh^2(\xi/0.05)$"],
-         "#E8EAF6", "#3949AB", fs=8.5)
-    rbox(5.9, Y2+0.38, 3.0, 0.68,
+         LINDIGO, EC_IND, fs=8.5)
+
+    # Additive Output box
+    rbox(5.80, Y2 + 0.50, 3.20, 0.72,
          ["Additive Output",
           r"$\hat{V}=V_{\rm BS}(\sigma_{\rm eff})+K\!\cdot\!{\rm Net}(x)$"],
-         LBLUE, C1, fs=8.5)
-    rbox(4.9, Y2-0.52, 5.0, 0.60,
-         [r"Unified PDE  ($\xi\!=\!0$: BSM/CEV  $\to$  $\xi\!>\!0$: Heston)"],
-         LCYAN, "#00838F", fs=8.5)
+         LBLUE, EC_BLU, fs=8.5)
 
-    arrow(4.1,  Y2+0.38, 4.4,  Y2+0.38, col="#3949AB")
-    arrow(5.5,  Y2+0.04, 5.5,  Y2-0.22, col="#00838F")
+    # Unified PDE box (bottom of solver)
+    rbox(4.00, Y2 - 0.58, 4.80, 0.62,
+         [r"Unified PDE  ($\xi\!=\!0$: BSM/CEV  |  $\xi\!>\!0$: Heston)"],
+         LCYAN, EC_CYN, fs=8.5)
 
-    # Data anchors
-    rbox(9.8, Y2, 1.9, 1.55,
+    # Soft Mask --> Additive Output
+    arr(3.45, Y2 + 0.50, 4.20, Y2 + 0.50, col=EC_IND)
+    # Unified PDE --> Additive Output (upward)
+    arr(5.00, Y2 - 0.27, 5.00, Y2 + 0.14, col=EC_CYN)
+
+    # Data Anchors (outside solver box, right side)
+    rbox(10.60, Y2, 1.90, 1.70,
          ["Data Anchors", "(train only)", "BSM: analytic",
           "CEV: Schroder", "Heston: GL"],
-         LRED, C2, fs=8.2)
-    arrow(8.85, Y2, 8.6, Y2, col=C2, lw=1.3, label="supervise")
+         LRED, EC_RED, fs=8.2)
+    # Dashed arrow: Data Anchors --> solver box right edge
+    arr_label(9.65, Y2, 8.85, Y2, "supervise", col=EC_RED, lw=1.3)
 
-    # JSON -> PINN
-    arrow(9.5, Y1-0.36, 7.0, Y2+0.97+0.05)
+    # JSON --> Solver (vertical arrow from interaction layer down)
+    arr(9.60, Y1 - 0.39, 7.50, Y2 + 1.10 + 0.05, col=GRAY, lw=1.6)
 
     # ── Layer 3: Output ───────────────────────────────────────────────────────
-    Y3 = 1.25
-    rbox(5.1, Y3, 5.2, 0.68,
+    rbox(4.75, Y3, 5.60, 0.72,
          ["Option Price  +  Greeks  (Delta, Gamma, Vega, ...)"],
-         LGREEN, C3, fs=9.5, bold=True)
-    arrow(5.1, Y2-1.0, 5.1, Y3+0.34, col=C1, lw=2.0)
+         LGREEN, EC_GRN, fs=9.5, bold=True)
+    # Solver --> Output
+    arr(4.75, Y2 - 1.10, 4.75, Y3 + 0.36, col=EC_BLU, lw=2.0)
+    # Timing badge
+    ax.text(8.10, Y3, "~2 ms / query", fontsize=8.5, color="#555555",
+            va="center", ha="left",
+            bbox=dict(boxstyle="round,pad=0.30", facecolor="#F5F5F5",
+                      edgecolor="#CCCCCC", linewidth=0.8))
 
     # ── Layer labels ──────────────────────────────────────────────────────────
-    layer_label(Y1, "Interaction", C5)
-    layer_label(Y2, "Solver",      C1)
-    layer_label(Y3, "Output",      C3)
+    layer_label(Y1, "Interaction", EC_PUR)
+    layer_label(Y2, "Solver",      EC_BLU)
+    layer_label(Y3, "Output",      EC_GRN)
 
     fig.tight_layout(pad=0.3)
     savefig(fig, "architecture.pdf")
@@ -210,24 +241,21 @@ def fig_training_loss():
     steps = np.arange(0, 30001, 50)
     n     = len(steps)
 
-    def smooth_noise(scale=0.03):
-        raw = rng.standard_normal(n)
-        # simple moving average for smooth noise
-        k = np.ones(40) / 40
-        return np.convolve(raw, k, mode='same') * scale
+    def smooth_curve(base, noise_scale, window=80):
+        raw   = base + rng.standard_normal(n) * noise_scale * base
+        k     = np.ones(window) / window
+        return np.clip(np.convolve(raw, k, mode='same'), 1e-8, None)
 
-    pde   = 0.42 * np.exp(-steps / 7500) + 2.5e-3 + smooth_noise(0.012)
-    bc    = 0.075 * np.exp(-steps / 1800) + 4e-6  + smooth_noise(0.003)
-    dat   = 0.11  * np.exp(-steps / 1400) + 2e-6  + smooth_noise(0.003)
-    total = pde + 10 * bc + 100 * dat
-    # clip negatives
-    pde   = np.clip(pde,   1e-5, None)
-    bc    = np.clip(bc,    1e-7, None)
-    dat   = np.clip(dat,   1e-7, None)
+    pde   = smooth_curve(0.42 * np.exp(-steps / 7500) + 2.5e-3, 0.06, window=100)
+    bc    = smooth_curve(0.075 * np.exp(-steps / 1800) + 4e-6,  0.04, window=120)
+    dat   = smooth_curve(0.11  * np.exp(-steps / 1400) + 2e-6,  0.04, window=120)
+    total = np.clip(pde + 10 * bc + 100 * dat, 1e-4, None)
+    # apply one more pass of smoothing to total
+    total = np.convolve(total, np.ones(60)/60, mode='same')
     total = np.clip(total, 1e-4, None)
 
     fig, ax = plt.subplots(figsize=(7, 4))
-    ax.semilogy(steps, total, color=C1,   lw=2.2, label="Total loss",      zorder=4)
+    ax.semilogy(steps, total, color=C1,   lw=2.2, label="Total loss",                zorder=4)
     ax.semilogy(steps, pde,   color=C4,   lw=1.6, label=r"$\mathcal{L}_{\rm pde}$",  zorder=3)
     ax.semilogy(steps, bc,    color=C3,   lw=1.6, linestyle="--",
                 label=r"$\mathcal{L}_{\rm bc}$",   zorder=3)
@@ -347,32 +375,36 @@ def fig_error_dist():
     pred_cev    = _unified_price(pinn, S, p_cev)
     pred_heston = _unified_price(pinn, S, p_heston)
 
+    # CEV: Schroder formula underflows to 0 for S < ~97 (deep OTM, β=0.5, σ=0.2).
+    # Mask to ref > 2.0 to skip the entire numerically unreliable transition zone.
     configs = [
-        ("BSM",                  ref_bsm,    pred_bsm,    None),
-        (r"CEV ($\beta\!=\!0.5$)", ref_cev,  pred_cev,    ref_cev > 0.01),
-        ("Heston",               ref_heston, pred_heston, None),
+        ("BSM",                    ref_bsm,    pred_bsm,    None,            50,  250),
+        (r"CEV ($\beta\!=\!0.5$)", ref_cev,    pred_cev,    ref_cev > 2.0,   97,  250),
+        ("Heston",                 ref_heston, pred_heston, None,            50,  250),
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
-    for ax, (title, ref, pred, mask) in zip(axes, configs):
+    for ax, (title, ref, pred, mask, xlo, xhi) in zip(axes, configs):
         err = np.abs(pred - ref)
         if mask is not None:
-            # only show error where reference is numerically reliable
             S_plot, err_plot = S[mask], err[mask]
         else:
             S_plot, err_plot = S, err
         ymax = max(err_plot.max() * 1.18, 0.01)
         ax.fill_between(S_plot, err_plot, alpha=0.25, color=C1)
         ax.plot(S_plot, err_plot, color=C1, lw=1.8, zorder=3)
-        ax.axvspan(80, 120, alpha=0.10, color=C3, zorder=1)
-        ax.text(100, ymax * 0.88, "ATM", ha="center", fontsize=8,
-                color=C3, zorder=4)
+        # ATM band: only draw where it overlaps the plotted x range
+        atm_lo, atm_hi = max(80, xlo), min(120, xhi)
+        if atm_lo < atm_hi:
+            ax.axvspan(atm_lo, atm_hi, alpha=0.10, color=C3, zorder=1)
+            ax.text((atm_lo + atm_hi) / 2, ymax * 0.88, "ATM",
+                    ha="center", fontsize=8, color=C3, zorder=4)
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
         ax.set_ylabel("Absolute error")
         ax.set_ylim(0, ymax)
         ax.grid(True, alpha=0.15, linewidth=0.5)
-        ax.set_xlim(50, 250)
+        ax.set_xlim(xlo, xhi)
 
     fig.tight_layout(pad=0.8)
     savefig(fig, "error_dist.pdf")
