@@ -2,33 +2,6 @@
 
 本附录介绍统一PINN期权定价系统的代码架构和关键模块的实现细节，供读者复现实验结果参考。
 
-\section{项目目录结构}
-
-系统代码组织如下：
-
-\begin{verbatim}
-uni_pinn/
-├── README.md                    # 复现指南
-├── option_pinn/
-│   ├── unified_pinn_v2.py       # 统一PINN核心模型（v16）
-│   ├── ref_solvers.py           # 参考解（BSM/CEV/Heston解析/半解析）
-│   ├── eval_all.py              # 合成数据与市场数据评估脚本
-│   ├── llm_test.py              # LLM路由层测试（20个测试用例）
-│   ├── ablation.py              # 消融实验（三个消融变体）
-│   ├── greeks_validation.py     # Greeks计算与验证
-│   ├── generate_figures.py      # 论文图表生成
-│   ├── llm_router.py            # LLM路由层（DeepSeek API）
-│   ├── independent/             # 独立PINN基线
-│   │   ├── bsm_pinn.py          # BSM门控网络（Dhiman & Hu 2023）
-│   │   ├── cev_pinn.py          # CEV门控网络
-│   │   ├── heston_hainaut.py    # Hainaut & Casas (2024) 参数化PINN
-│   │   └── train_independent.py # 独立基线训练脚本
-│   ├── data/
-│   │   └── spy_quotedata.csv    # SPY期权链数据（2026-05-11）
-│   └── results/                 # 评估输出（CSV，模型权重.pt）
-└── thesis/                      # LaTeX论文源码
-\end{verbatim}
-
 \section{统一PINN核心模型}
 
 \subsection{网络定义伪代码}
