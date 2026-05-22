@@ -16,18 +16,23 @@ plt.rcParams.update({
     "font.family":        "serif",
     "font.serif":         ["DejaVu Serif", "Times New Roman", "serif"],
     "font.size":          11,
-    "axes.titlesize":     12,
+    "axes.titlesize":     13,
     "axes.labelsize":     11,
-    "axes.linewidth":     0.8,
+    "axes.linewidth":     1.0,
     "axes.spines.top":    False,
     "axes.spines.right":  False,
     "xtick.direction":    "in",
     "ytick.direction":    "in",
     "xtick.major.size":   4,
     "ytick.major.size":   4,
-    "legend.framealpha":  0.92,
-    "legend.edgecolor":   "#cccccc",
+    "xtick.minor.visible": True,
+    "ytick.minor.visible": True,
+    "xtick.minor.size":   2,
+    "ytick.minor.size":   2,
+    "legend.framealpha":  0.95,
+    "legend.edgecolor":   "#bbbbbb",
     "legend.fontsize":    9.5,
+    "legend.handlelength": 2.8,
     "text.usetex":        False,
     "figure.dpi":         150,
 })
@@ -108,11 +113,11 @@ def fig_training_loss():
     total = np.clip(total, 1e-4, None)
 
     fig, ax = plt.subplots(figsize=(7, 4))
-    ax.semilogy(steps, total, color=C1,   lw=2.2, label="Total loss",                zorder=4)
-    ax.semilogy(steps, pde,   color=C4,   lw=1.6, label=r"$\mathcal{L}_{\rm pde}$",  zorder=3)
-    ax.semilogy(steps, bc,    color=C3,   lw=1.6, linestyle="--",
+    ax.semilogy(steps, total, color=C1,   lw=2.4, label="Total loss",                zorder=4)
+    ax.semilogy(steps, pde,   color=C4,   lw=2.0, label=r"$\mathcal{L}_{\rm pde}$",  zorder=3)
+    ax.semilogy(steps, bc,    color=C3,   lw=2.0, linestyle=(0, (5, 3)),
                 label=r"$\mathcal{L}_{\rm bc}$",   zorder=3)
-    ax.semilogy(steps, dat,   color=C2,   lw=1.6, linestyle=":",
+    ax.semilogy(steps, dat,   color=C2,   lw=2.0, linestyle=(0, (2, 2)),
                 label=r"$\mathcal{L}_{\rm data}$",  zorder=3)
 
     ax.set_xlabel("Training step")
@@ -190,9 +195,8 @@ def fig_price_curves():
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
     for ax, (title, ref, pred) in zip(axes, configs):
         ax.plot(S, ref,  color="black", lw=2.2, label="Reference", zorder=4)
-        # plot PINN as scatter markers so it's visible even when overlapping
-        ax.plot(S[::4], pred[::4], color=C2, marker="o", markersize=4,
-                linestyle="none", label="Unified PINN", zorder=5)
+        ax.plot(S, pred, color=C2, lw=2.2, linestyle=(0, (5, 3)),
+                label="Unified PINN", zorder=5)
         ax.axvline(K, color=GRAY, lw=0.7, linestyle=":", alpha=0.6)
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
@@ -257,12 +261,13 @@ def fig_eval_compare():
 
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.8))
     for ax, title, ref, uni, ind in zip(axes, titles, refs, unis, inds):
-        ax.plot(S, ref, color="black", lw=2.2, label="Reference",     zorder=4)
-        ax.plot(S[::4], uni[::4], color=C1, marker="o", markersize=4,
-                linestyle="none", label="Unified PINN", zorder=5)
+        ax.plot(S, ref, color="black", lw=2.2, linestyle="-",
+                label="Reference", zorder=4)
+        ax.plot(S, uni, color=C1, lw=2.2, linestyle=(0, (5, 3)),
+                label="Unified PINN", zorder=5)
         if ind is not None:
-            ax.plot(S[::4], ind[::4], color=C2, marker="s", markersize=4,
-                    linestyle="none", label="Independent PINN", zorder=5)
+            ax.plot(S, ind, color=C2, lw=2.2, linestyle=(0, (2, 2)),
+                    label="Independent PINN", zorder=3)
         ax.axvline(K, color=GRAY, lw=0.7, linestyle=":", alpha=0.6)
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
