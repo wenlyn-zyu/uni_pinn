@@ -31,15 +31,15 @@
 \setcounter{page}{1}
 \pagenumbering{Roman}
 
-期权定价是金融工程的核心问题之一。Black-Scholes-Merton（BSM）模型、常弹性方差（Constant Elasticity of Variance，CEV）模型和Heston随机波动率模型是三大经典期权定价框架，分别适用于不同的市场假设，其定价问题在数学上均归结为求解相应的偏微分方程（Partial Differential Equation，PDE）：BSM和CEV对应二维抛物型PDE，Heston引入随机波动率后升至三维。传统数值方法（有限差分、有限元）在求解高维PDE时面临维数灾难，计算代价随维度指数增长；而现有物理信息神经网络（Physics-Informed Neural Network，PINN）研究大多针对单一模型，缺乏多模型统一求解的方法。
+期权定价是金融工程的核心问题之一。Black-Scholes-Merton（BSM）模型、常弹性方差（Constant Elasticity of Variance，CEV）模型和Heston随机波动率模型是三大经典期权定价框架，分别适用于不同的市场假设，其定价问题在数学上均归结为求解相应的偏微分方程（Partial Differential Equation，PDE）：BSM和CEV对应二维抛物型PDE，Heston引入随机波动率后升至三维。传统数值方法（有限差分、有限元）在求解高维PDE时面临维数灾难，计算代价随维度指数增长。物理信息神经网络（Physics-Informed Neural Network，PINN）将PDE残差嵌入损失函数，无需网格剖分，能够有效缓解这一计算瓶颈；然而现有PINN研究大多针对单一定价模型，缺乏将BSM、CEV、Heston统一求解的方法。
 
 本文研究基于PINN与大语言模型（Large Language Model，LLM）的多模型期权定价方法。在PINN部分，通过软掩码（Soft Mask）机制和加法参数化输出，将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，由一个9维输入的深层全连接网络同时覆盖三种模型的解映射，无需分别训练独立网络。软掩码通过$\tanh(\xi/0.05)^2$实现模型间的连续插值，当随机波动率参数$\xi\to 0$时自动退化为BSM/CEV，当$\xi$较大时激活Heston的随机波动率项。加法参数化以Black-Scholes解析解为基线，网络学习绝对修正量，解决了乘法参数化在深度虚值区域退化的问题。终值条件通过Black-Scholes公式的极限行为自然满足，无需额外约束项。
 
 在LLM部分，引入DeepSeek API作为智能路由层，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，使非专业用户无需了解模型细节即可完成期权定价。
 
-实验在两类数据上进行评估：（1）合成数据，基于54组参数变体（6 BSM + 12 CEV + 36 Heston）生成的解析/半解析参考解，评估点$S\in[50,250]$共50个均匀采样点；（2）真实市场数据，使用CBOE提供的SPY（标普500 ETF）期权链数据（2026年5月11日，SPY现价\$739.75），共23个到期日、2824个合约，覆盖$T\in[0.06,2.59]$年。实验结果表明，统一PINN在三种模型的平值附近区域相对误差均低于1\%，统一框架在BSM和CEV上的精度优于独立训练的PINN基线。LLM路由层在全部20个测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，具备实时定价能力。
+实验在两类数据上进行评估：（1）合成数据，基于72组参数变体（6 BSM + 12 CEV + 54 Heston）生成的解析/半解析参考解，评估点$S\in[50,250]$共50个均匀采样点；（2）真实市场数据，使用CBOE提供的SPY（标普500 ETF）期权链数据（2026年5月11日，SPY现价\$739.75），共23个到期日、2824个合约，覆盖$T\in[0.06,2.59]$年。实验结果表明，统一PINN在三种模型的平值附近区域相对误差均低于1\%，统一框架在BSM和CEV上的精度优于独立训练的PINN基线。LLM路由层在全部20个测试用例上实现了100\%的模型选择准确率。单次推断耗时约2ms，具备实时定价能力。
 
-\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；Heston模型；大语言模型；软掩码}
+\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；CEV模型；Heston模型；大语言模型；软掩码}
 
 %---------------------------------------------------------------------------%
 %->> 英文摘要
@@ -52,6 +52,6 @@ This paper proposes and implements a unified option pricing framework based on P
 
 In the LLM component, the DeepSeek API serves as an intelligent routing layer, achieving reliable parameter extraction and model selection through structured JSON output, supporting both Chinese and English natural language input.
 
-Experiments are conducted on two types of data: (1) synthetic data generated from analytical/semi-analytical reference solutions across 54 parameter variants (6 BSM + 12 CEV + 36 Heston), evaluated at 50 uniformly sampled points $S\in[50,250]$; (2) real market data from CBOE SPY (S\&P 500 ETF) option chain (May 11, 2026, SPY price \$739.75), comprising 2,824 contracts across 23 expiries covering $T\in[0.06,2.59]$ years. Experimental results show that the unified PINN achieves ATM relative errors below 1\% across all three models, and outperforms independently trained PINN baselines on BSM and CEV. The LLM routing layer achieves 100\% model selection accuracy on all 20 test cases. Single inference takes approximately 2ms, enabling real-time pricing.
+Experiments are conducted on two types of data: (1) synthetic data generated from analytical/semi-analytical reference solutions across 72 parameter variants (6 BSM + 12 CEV + 54 Heston), evaluated at 50 uniformly sampled points $S\in[50,250]$; (2) real market data from CBOE SPY (S\&P 500 ETF) option chain (May 11, 2026, SPY price \$739.75), comprising 2,824 contracts across 23 expiries covering $T\in[0.06,2.59]$ years. Experimental results show that the unified PINN achieves ATM relative errors below 1\% across all three models, and outperforms independently trained PINN baselines on BSM and CEV. The LLM routing layer achieves 100\% model selection accuracy on all 20 test cases. Single inference takes approximately 2ms, enabling real-time pricing.
 
 \englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; Heston Model; Large Language Models; Soft Mask}

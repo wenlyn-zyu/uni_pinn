@@ -1,18 +1,8 @@
 \chapter{结论}\label{chap:conclusion}
 
-\section{与现有工作的比较}\label{sec:comparison_related}
+\section{与现有工作的比较及工作总结}\label{sec:comparison_related}
 
-本文的工作与现有PINN期权定价研究的主要区别体现在以下几个维度。
-
-在多模型统一性方面，现有工作（Dhiman等\cite{dhiman2023pinn}、Hainaut等\cite{hainaut2024heston}）均针对单一模型，本文是首个将BSM、CEV、Heston三大模型统一在单一网络中的工作。多模型联合训练带来了互相增益：BSM/CEV的简单结构为Heston提供了良好的初始化，有助于克服Heston二维PDE的收敛困难。与参数化PINN相比，统一PINN在BSM和CEV上精度更高，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率，说明软掩码和加法参数化实现了更高效的归纳偏置。
-
-在交互方式方面，现有PINN工具均为纯数值接口，用户需手动指定模型类型和参数。本文引入LLM路由层，支持自然语言输入，是PINN与LLM结合用于期权定价的首次尝试。与PDE-AGENT\cite{liu2025pdeagent}相比，本文的LLM仅作为路由层，不参与求解过程，因此延迟更低、可靠性更高。
-
-在约束处理方面，本文采用加法参数化输出，以Black-Scholes解析解为基线，这与Zamxaka\cite{zamxaka2023cev}的参数化PINN思路相近，但本文将其推广至多模型统一求解，并结合软掩码实现了模型间的连续插值。
-
-\section{工作总结}\label{sec:summary}
-
-本文研究了基于PINN的多模型期权定价方法，通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，以LLM路由层支持自然语言输入。实验结果表明，三种模型的ATM相对误差均低于1\%，推断速度约2ms，LLM路由层准确率100\%，消融实验验证了各核心组件的必要性。
+本文是首个将BSM、CEV、Heston三大模型统一在单一PINN网络中的工作。现有研究（Dhiman等\cite{dhiman2023pinn}、Hainaut等\cite{hainaut2024heston}）均针对单一模型分别训练，无法共享网络权重；本文通过软掩码机制和加法参数化输出，以一个网络同时覆盖三种模型的解映射，多模型联合训练还带来了互相增益：BSM/CEV的简单结构为Heston提供了良好的初始化，有助于克服二维PDE的收敛困难。与参数化PINN相比，统一PINN在BSM和CEV上精度更高，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，说明软掩码和加法参数化实现了更高效的归纳偏置。在交互方式上，本文引入LLM路由层支持自然语言输入，是PINN与LLM结合用于期权定价的首次尝试；与PDE-AGENT\cite{liu2025pdeagent}相比，LLM仅作为路由层而不参与求解，延迟更低、可靠性更高。实验结果表明，三种模型的ATM相对误差均低于1\%，推断速度约2ms，LLM路由层准确率100\%，消融实验验证了各核心组件的必要性。
 
 \section{局限性}\label{sec:limitations}
 

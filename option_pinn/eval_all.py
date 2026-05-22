@@ -132,7 +132,7 @@ def load_hainaut():
 
 
 def _build_param_list():
-    """复现 unified_pinn_v2 训练时的参数列表（BSM×6 + CEV×12 + Heston×36 = 54）。"""
+    """复现 unified_pinn_v2 训练时的参数列表（BSM×6 + CEV×12 + Heston×54 = 72）。"""
     from unified_pinn_v2 import ModelParams
     params = []
     for sigma in [0.1, 0.15, 0.2, 0.25, 0.3, 0.35]:

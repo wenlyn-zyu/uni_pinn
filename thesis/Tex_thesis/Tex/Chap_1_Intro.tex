@@ -18,15 +18,7 @@
 
 \section{研究目标与贡献}\label{sec:contributions}
 
-本文研究基于物理信息神经网络（Physics-Informed Neural Network，PINN）的多模型期权定价方法，通过统一PDE算子将BSM、CEV、Heston三大模型纳入单一网络，并以大语言模型（Large Language Model，LLM）作为智能路由层实现自然语言交互。主要贡献如下。
-
-\textbf{统一PDE算子。}设计软掩码机制$\text{mask}=\tanh(\xi/0.05)^2$，将三大模型的扩散系数统一为$a=(1-\text{mask})\sigma^2 S^{2\beta}+\text{mask}\cdot v S^2$，实现模型间的连续插值，避免硬切换带来的梯度不连续问题。
-
-\textbf{加法参数化输出。}以Black-Scholes解析解$V_\text{BS}$为基线，网络输出$\hat{V}=V_\text{BS}+K\cdot\text{net}(x)$，解决了深度虚值区域$V_\text{BS}\to 0$时的数值退化问题，同时提供良好的初始化。
-
-\textbf{LLM路由层。}将DeepSeek LLM与统一PINN求解器结合，通过结构化JSON输出实现可靠的参数提取和模型选择，支持中英文自然语言输入。
-
-实验结果：统一PINN在BSM（MAE=0.0005，ATM相对误差0.0009\%）、CEV（MAE=0.032，ATM相对误差0.79\%）和Heston（MAE=0.102，ATM相对误差0.599\%）上均达到实用精度，三种模型的ATM相对误差均低于1\%，在BSM和CEV上的精度优于独立训练的PINN基线；LLM路由层在20个测试用例上实现了100\%的模型选择准确率；消融实验验证了三个核心组件的必要性。
+本文研究基于物理信息神经网络（Physics-Informed Neural Network，PINN）的多模型期权定价方法，通过统一PDE算子将BSM、CEV、Heston三大模型纳入单一网络，并以大语言模型（Large Language Model，LLM）作为智能路由层实现自然语言交互。在方法设计上，本文提出软掩码机制$\text{mask}=\tanh(\xi/0.05)^2$，将三大模型的扩散系数统一为连续参数化形式，避免了硬切换带来的梯度不连续；采用加法参数化输出$\hat{V}=V_\text{BS}+K\cdot\text{net}(x)$，以Black-Scholes解析解为基线，从根本上解决了深度虚值区域的数值退化问题，同时为网络提供了量级正确的训练起点；引入DeepSeek LLM作为路由层，通过结构化JSON输出实现可靠的参数提取与模型选择，支持中英文自然语言输入。实验表明，三种模型的平值附近相对误差均低于1\%，在BSM和CEV上的精度优于独立训练的PINN基线，LLM路由层在全部测试用例上实现了100\%的模型选择准确率，消融实验进一步验证了各核心组件的必要性。
 
 \section{论文结构}\label{sec:structure}
 

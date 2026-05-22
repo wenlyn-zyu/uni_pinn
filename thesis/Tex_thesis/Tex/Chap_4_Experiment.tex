@@ -80,11 +80,11 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
-  \caption{统一PINN（v16）训练损失曲线（30000步，54个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
+  \caption{统一PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
   \label{fig:training_loss}
 \end{figure}
 
-训练过程呈现以下规律：PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。54个参数变体（6 BSM + 12 CEV + 36 Heston）的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
+训练过程呈现以下规律：PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。72个参数变体（6 BSM + 12 CEV + 54 Heston）的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
 
 \section{精度评估}\label{sec:accuracy}
 
@@ -202,7 +202,7 @@
   \label{tab:market_results}
   \begin{tabular}{lrrrrrrrr}
     \hline
-    到期日 & $T$(年) & $n$ & BSM & Heston & PINN-BSM & PINN-Heston & 参数化PINN \\
+    到期日 & $T$(年) & $n$ & 校准BSM & 校准Heston & PINN-BSM & PINN-Heston & 参数化PINN \\
     \hline
     Jun 05 2026 & 0.060 & 197 & 1.78 & \textbf{0.34} & 1.78 & 15.64 & 27.13 \\
     Jun 30 2026 & 0.129 & 211 & 1.46 & \textbf{0.14} & 1.46 & 34.30 & 42.33 \\

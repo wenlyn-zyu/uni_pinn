@@ -1,5 +1,7 @@
 \chapter{统一PINN期权定价方法设计}\label{chap:method}
 
+本章介绍多模型统一PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
@@ -155,7 +157,7 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 \section{训练策略}\label{sec:training}
 
-训练时对54个参数变体（6 BSM + 12 CEV + 36 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
+训练时对72个参数变体（6 BSM + 12 CEV + 54 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
 
 使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{data})=(1, 10, 100)$。
 
