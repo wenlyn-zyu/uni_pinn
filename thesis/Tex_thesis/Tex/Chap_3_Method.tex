@@ -136,7 +136,7 @@ PDE残差损失在求解域内随机采样$N_c$个配点，计算统一PDE算子
 
 \section{参数化PINN对比方法}\label{sec:parametric_pinn}
 
-为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_{\mathrm{BS}}(\sigma_{\mathrm{eff}})+K\cdot\mathrm{net}(x)$和软掩码机制。与三模型PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为三模型PINN的4倍）。实验结果见第~\ref{sec:compare}节。
+为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_{\mathrm{BS}}(\sigma_{\mathrm{eff}})+K\cdot\mathrm{net}(x)$和软掩码机制。与三模型PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为三模型PINN的4倍）。
 
 \section{本章小结}\label{sec:method_summary}
 

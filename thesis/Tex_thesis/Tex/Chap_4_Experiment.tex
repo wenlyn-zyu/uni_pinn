@@ -95,7 +95,7 @@
 
 图~\ref{fig:training_loss}展示了三模型PINN的训练损失曲线。PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降；余弦退火调度使网络在后期持续精细化。72个参数变体的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
   \caption{三模型PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失同步下降；边界条件损失和数据锚点损失在训练早期快速收敛至$10^{-5}$量级。}
@@ -104,7 +104,7 @@
 
 表~\ref{tab:compare}给出了三模型PINN与独立PINN和参数化PINN的精度对比，图~\ref{fig:compare}展示了各方法的价格曲线对比结果。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{各方法精度对比（$S\in[50,250]$，$t=0$）}
   \label{tab:compare}
@@ -127,7 +127,7 @@
   \end{tabular}
 \end{table}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{Img/eval_compare.pdf}
   \caption{三模型PINN与参考解价格曲线对比（$t=0$，$S\in[50,250]$）。实线为参考解，虚线为三模型PINN；竖虚线标记平值点（$S=K$）。}
