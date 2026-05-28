@@ -102,7 +102,7 @@
   \label{fig:training_loss}
 \end{figure}
 
-表~\ref{tab:compare}给出了三模型PINN与独立PINN和参数化PINN的精度对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。
+表~\ref{tab:compare}给出了三模型PINN与独立PINN和参数化PINN的精度对比，图~\ref{fig:compare}展示了各方法的价格曲线对比结果。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。
 
 \begin{table}[htbp]
   \centering
@@ -151,7 +151,7 @@
   \end{tabular}
 \end{table}
 
-为进一步验证三模型PINN在真实市场条件下的表现，本节使用第~\ref{sec:exp_data}节描述的SPY期权链数据，选取8个代表性到期日进行详细分析。表~\ref{tab:market_results}报告了五种方法相对市场价格的MAE（单位：美元）。
+为进一步验证三模型PINN在真实市场条件下的表现，本节使用第~\ref{sec:exp_data}节描述的SPY期权链数据，选取8个代表性到期日进行详细分析。在短期期权（$T<0.15$年）上，三个校准模型的MAE几乎相同，说明短期波动率微笑较平坦，额外自由度对定价贡献有限。在中长期期权（$T>0.25$年）上，Heston明显优于BSM：以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%，体现了随机波动率模型在中长期定价中的优势。Sep 30和Dec 31两个到期日误差偏高，可能与季末、年末流动性变化有关，属于市场特殊情况。PINN-BSM的MAE与校准BSM几乎相同（$T<0.4$年），验证了本文方法的参数泛化性。PINN-Heston的MAE显著高于校准Heston，根本原因在于：训练参数范围（$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$）无法覆盖SPY校准得到的极端参数（$\kappa$可高达20，$\xi$可高达2.1）；以及三模型PINN用同一网络拟合三种模型，Heston的5维参数空间构成容量瓶颈，需从架构层面改进，留作未来工作（见第~\ref{sec:limitations}节）。五种方法相对市场价格的MAE汇总于表~\ref{tab:market_results}。
 
 \begin{table}[htbp]
   \centering
@@ -172,8 +172,6 @@
     \hline
   \end{tabular}
 \end{table}
-
-在短期期权（$T<0.15$年）上，三个校准模型的MAE几乎相同，说明短期波动率微笑较平坦，额外自由度对定价贡献有限。在中长期期权（$T>0.25$年）上，Heston明显优于BSM：以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%，体现了随机波动率模型在中长期定价中的优势。Sep 30和Dec 31两个到期日误差偏高，可能与季末、年末流动性变化有关，属于市场特殊情况。PINN-BSM的MAE与校准BSM几乎相同（$T<0.4$年），验证了本文方法的参数泛化性。PINN-Heston的MAE显著高于校准Heston，根本原因在于：训练参数范围（$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$）无法覆盖SPY校准得到的极端参数（$\kappa$可高达20，$\xi$可高达2.1）；以及三模型PINN用同一网络拟合三种模型，Heston的5维参数空间构成容量瓶颈，需从架构层面改进，留作未来工作（见第~\ref{sec:limitations}节）。
 
 \section{本章小结}\label{sec:exp_summary}
 
