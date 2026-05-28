@@ -7,50 +7,53 @@
 \begin{table}[htbp]
   \vspace{-6pt}
   \centering
-  \caption{实验中使用的期权定价模型参数}
-  \label{tab:model_params}
-  \begin{tabular}{p{5cm}ccc}
-    \hline
-    参数 & BSM & CEV & Heston \\
-    \hline
-    执行价$K$ & 100 & 100 & 100 \\
-    到期时间$T$ & 1年 & 1年 & 1年 \\
-    无风险利率$r$ & 0.05 & 0.05 & 0.05 \\
-    波动率$\sigma$ & 0.2 & 0.2 & --- \\
-    弹性参数$\beta$ & 1.0 & 0.5 & --- \\
-    均值回归速度$\kappa$ & --- & --- & 2.0 \\
-    长期方差$\theta$ & --- & --- & 0.04 \\
-    vol-of-vol $\xi$ & --- & --- & 0.3 \\
-    相关系数$\rho$ & --- & --- & $-0.7$ \\
-    初始方差$v_0$ & 0.04 & 0.04 & 0.04 \\
-    \hline
-  \end{tabular}
+  \begin{minipage}[t]{0.50\textwidth}
+    \centering
+    \caption{实验中使用的期权定价模型参数}
+    \label{tab:model_params}
+    \begin{tabular}{p{3.2cm}ccc}
+      \hline
+      参数 & BSM & CEV & Heston \\
+      \hline
+      执行价$K$ & 100 & 100 & 100 \\
+      到期时间$T$ & 1年 & 1年 & 1年 \\
+      无风险利率$r$ & 0.05 & 0.05 & 0.05 \\
+      波动率$\sigma$ & 0.2 & 0.2 & --- \\
+      弹性参数$\beta$ & 1.0 & 0.5 & --- \\
+      均值回归速度$\kappa$ & --- & --- & 2.0 \\
+      长期方差$\theta$ & --- & --- & 0.04 \\
+      vol-of-vol $\xi$ & --- & --- & 0.3 \\
+      相关系数$\rho$ & --- & --- & $-0.7$ \\
+      初始方差$v_0$ & 0.04 & 0.04 & 0.04 \\
+      \hline
+    \end{tabular}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.46\textwidth}
+    \centering
+    \caption{三模型PINN网络超参数}
+    \label{tab:hyperparams}
+    \begin{tabular}{ll}
+      \hline
+      超参数 & 取值 \\
+      \hline
+      网络层数（深度） & 6 \\
+      每层神经元数（宽度） & 128 \\
+      激活函数 & $\tanh$ \\
+      输入维度 & 9 \\
+      输出维度 & 1 \\
+      优化器 & Adam \cite{kingma2014adam} \\
+      初始学习率 & $10^{-3}$ \\
+      学习率衰减 & 余弦退火（$\eta_\text{min}=10^{-5}$） \\
+      训练步数 & 30000 \\
+      每步配点数$N_c$ & 每模型5000点 \\
+      边界点数$N_b$ & 每模型500点 \\
+      数据锚点数$N_d$ & 每模型20点 \\
+      损失权重 & $(1, 10, 100)$ \\
+      \hline
+    \end{tabular}
+  \end{minipage}
   \vspace{-6pt}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \caption{三模型PINN网络超参数}
-  \label{tab:hyperparams}
-  \begin{tabular}{ll}
-    \hline
-    超参数 & 取值 \\
-    \hline
-    网络层数（深度） & 6 \\
-    每层神经元数（宽度） & 128 \\
-    激活函数 & $\tanh$ \\
-    输入维度 & 9 \\
-    输出维度 & 1 \\
-    优化器 & Adam \cite{kingma2014adam} \\
-    初始学习率 & $10^{-3}$ \\
-    学习率衰减 & 余弦退火（$\eta_\text{min}=10^{-5}$） \\
-    训练步数 & 30000 \\
-    每步配点数$N_c$ & 每模型5000点 \\
-    边界点数$N_b$ & 每模型500点 \\
-    数据锚点数$N_d$ & 每模型20点 \\
-    损失权重$(w_\text{pde}, w_\text{bc}, w_\text{data})$ & $(1, 10, 100)$ \\
-    \hline
-  \end{tabular}
 \end{table}
 
 \section{数据集}\label{sec:exp_data}
