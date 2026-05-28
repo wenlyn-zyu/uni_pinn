@@ -1,11 +1,11 @@
 \chapter{基于大模型和PINN的三模型期权求解方式}\label{chap:method}
 
-本章介绍多模型统一PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
+本章介绍多模型三模型PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
-  \caption{多模型期权定价系统三层架构。交互层：用户以自然语言输入期权需求，LLM路由层提取参数并选择模型，输出结构化JSON。求解层：统一PINN求解器通过软掩码（$\mathrm{mask}=\tanh^2(\xi/0.05)$）和加法参数化（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$）统一三大模型PDE，训练时以解析解/半解析解作为数据锚点。输出层：单次前向传播（$\sim$2\,ms）返回期权价格及Greeks。}
+  \caption{多模型期权定价系统三层架构。交互层：用户以自然语言输入期权需求，LLM路由层提取参数并选择模型，输出结构化JSON。求解层：三模型PINN求解器通过软掩码（$\mathrm{mask}=\tanh^2(\xi/0.05)$）和加法参数化（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$）统一三大模型PDE，训练时以解析解/半解析解作为数据锚点。输出层：单次前向传播（$\sim$2\,ms）返回期权价格及Greeks。}
   \label{fig:architecture}
 \end{figure}
 
@@ -89,7 +89,7 @@ CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$�
 
 \subsection{损失函数与配点采样}
 
-统一PINN的总损失由PDE残差、边界条件和数据锚点三部分组成：
+三模型PINN的总损失由PDE残差、边界条件和数据锚点三部分组成：
 \begin{equation}\label{eq:total_loss}
   \mathcal{L}(\theta) = w_\text{pde}\,\mathcal{L}_\text{pde}
                       + w_\text{bc}\,\mathcal{L}_\text{bc}
@@ -128,15 +128,15 @@ PDE残差损失在求解域内随机采样$N_c$个配点，计算统一PDE算子
 }
 \end{verbatim}
 
-系统在接收到JSON输出后，进行参数范围校验（如$\sigma>0$，$\beta\in(0,1]$，$\xi>0$，$\rho\in(-1,1)$），对越界参数截断至合法范围，再传入统一PINN求解器。对于欧式看跌期权，通过看跌-看涨平价关系转换：
+系统在接收到JSON输出后，进行参数范围校验（如$\sigma>0$，$\beta\in(0,1]$，$\xi>0$，$\rho\in(-1,1)$），对越界参数截断至合法范围，再传入三模型PINN求解器。对于欧式看跌期权，通过看跌-看涨平价关系转换：
 \begin{equation}
   P = C - S + Ke^{-r(T-t)}.
 \end{equation}
-完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；统一PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
+完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；三模型PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
 
 \section{参数化PINN对比方法}\label{sec:parametric_pinn}
 
-为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_\text{BS}(\sigma_\text{eff})+K\cdot\text{net}(x)$和软掩码机制。与统一PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为统一PINN的4倍）。实验结果见第~\ref{sec:compare}节。
+为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_\text{BS}(\sigma_\text{eff})+K\cdot\text{net}(x)$和软掩码机制。与三模型PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为三模型PINN的4倍）。实验结果见第~\ref{sec:compare}节。
 
 \section{本章小结}\label{sec:method_summary}
 

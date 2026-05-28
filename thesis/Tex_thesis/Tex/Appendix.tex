@@ -1,8 +1,8 @@
 \chapter{代码架构与关键实现}\label{app:code}
 
-本附录介绍统一PINN期权定价系统的代码架构和关键模块的实现细节，供读者复现实验结果参考。
+本附录介绍三模型PINN期权定价系统的代码架构和关键模块的实现细节，供读者复现实验结果参考。
 
-\section{统一PINN核心模型}
+\section{三模型PINN核心模型}
 
 \subsection{网络定义伪代码}
 
@@ -165,7 +165,7 @@ Heston模型的欧式看涨期权价格通过特征函数方法计算：
 
 \begin{table}[htbp]
   \centering
-  \caption{统一PINN完整训练配置}
+  \caption{三模型PINN完整训练配置}
   \label{tab:train_config}
   \begin{tabular}{ll}
     \hline
