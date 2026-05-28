@@ -1,11 +1,11 @@
 \chapter{基于大模型和PINN的三模型期权求解方式}\label{chap:method}
 
-本章介绍多模型三模型PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
+本章介绍三模型PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{Img/architecture.pdf}
-  \caption{多模型期权定价系统三层架构。交互层：用户以自然语言输入期权需求，LLM路由层提取参数并选择模型，输出结构化JSON。求解层：三模型PINN求解器通过软掩码（$\mathrm{mask}=\tanh^2(\xi/0.05)$）和加法参数化（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$）统一三大模型PDE，训练时以解析解/半解析解作为数据锚点。输出层：单次前向传播（$\sim$2\,ms）返回期权价格及Greeks。}
+  \caption{三模型期权定价系统三层架构。交互层：用户以自然语言输入期权需求，LLM路由层提取参数并选择模型，输出结构化JSON。求解层：三模型PINN求解器通过软掩码（$\mathrm{mask}=\tanh^2(\xi/0.05)$）和加法参数化（$\hat{V}=V_\mathrm{BS}(\sigma_\mathrm{eff})+K\cdot\mathrm{Net}(\mathbf{x})$）统一三大模型PDE，训练时以解析解/半解析解作为数据锚点。输出层：单次前向传播（$\sim$2\,ms）返回期权价格及Greeks。}
   \label{fig:architecture}
 \end{figure}
 
