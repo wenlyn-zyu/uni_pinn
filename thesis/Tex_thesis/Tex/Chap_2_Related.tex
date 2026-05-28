@@ -2,8 +2,6 @@
 
 \section{期权定价模型}\label{sec:option_models}
 
-\subsection{Black-Scholes-Merton模型}
-
 Black、Scholes与Merton于1973年提出了期权定价的奠基性框架\cite{black1973pricing,merton1973theory}。假设标的资产价格$S$服从几何布朗运动：
 \begin{equation}
   dS = \mu S\,dt + \sigma S\,dW_t,
@@ -21,8 +19,6 @@ Black、Scholes与Merton于1973年提出了期权定价的奠基性框架\cite{b
 \end{equation}
 其中$d_1 = \frac{\ln(S/K)+(r+\sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}$，$d_2=d_1-\sigma\sqrt{T-t}$，$\Phi(\cdot)$为标准正态累积分布函数。BSM模型的主要局限在于假设波动率为常数，无法解释市场中普遍存在的波动率微笑现象。
 
-\subsection{常弹性方差模型}
-
 Cox和Ross\cite{cox1976valuation}提出了常弹性方差（CEV）模型，将扩散系数推广为依赖于标的价格的局部波动率：
 \begin{equation}
   dS = \mu S\,dt + \sigma S^{\beta}\,dW_t,
@@ -35,8 +31,6 @@ Cox和Ross\cite{cox1976valuation}提出了常弹性方差（CEV）模型，将�
   - rV = 0.
 \end{equation}
 本文取$\beta=0.5$（平方根过程）。Schroder\cite{schroder1989computing}指出，$\beta=0.5$时CEV欧式看涨期权存在精确解析解（非中心卡方分布），本文以此作为CEV的参考基准。
-
-\subsection{Heston随机波动率模型}
 
 Heston\cite{heston1993closed}将波动率建模为均值回归过程（CIR过程）：
 \begin{align}
@@ -66,8 +60,6 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
 其中各项分别为配点处的PDE残差、初值条件和边界条件的均方误差，$w_{\text{pde}},w_{\text{ic}},w_{\text{bc}}$为权重超参数。PDE残差通过自动微分精确计算，无需有限差分近似。PINN无需网格剖分，训练完成后对任意输入的推断时间约为毫秒级。
 
 在期权定价领域，Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，将模型参数与合约特征联合作为网络输入，实现了训练一次、多参数组合即时定价；该模型以PUT期权为输出，通过put-call parity转换为CALL价格，本文将其作为参数化Heston PINN的对比基准。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。上述参数化PINN工作的共同思路是将模型参数直接作为网络输入，使单个网络覆盖整个参数空间；然而，现有参数化PINN均针对单一定价模型，不同模型之间的PDE结构差异使得跨模型统一存在本质困难。本文在此基础上，通过软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现了真正意义上的多模型统一框架。
-
-\subsection{三种独立PINN的复现与基准建立}\label{subsec:reproduction}
 
 为提供可靠的对比基准，本文对上述三类代表性PINN方法进行了独立复现。
 
