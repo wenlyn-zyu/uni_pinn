@@ -102,22 +102,7 @@
   \label{fig:training_loss}
 \end{figure}
 
-表~\ref{tab:accuracy}报告了三模型PINN在三大模型上的精度，表~\ref{tab:compare}给出了与独立PINN和参数化PINN的对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。图~\ref{fig:compare}展示了各方法的价格曲线对比结果。
-
-\begin{table}[htbp]
-  \centering
-  \caption{三模型PINN（v16）在三大模型上的精度评估}
-  \label{tab:accuracy}
-  \begin{tabular}{lcc}
-    \hline
-    模型 & MAE & RelMAE$_\text{ATM}$ \\
-    \hline
-    BSM & 0.0005 & 0.0009\% \\
-    CEV ($\beta=0.5$) & 0.032 & 0.79\% \\
-    Heston & 0.102 & 0.599\% \\
-    \hline
-  \end{tabular}
-\end{table}
+表~\ref{tab:compare}给出了三模型PINN与独立PINN和参数化PINN的精度对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。
 
 \begin{table}[htbp]
   \centering
@@ -166,9 +151,7 @@
   \end{tabular}
 \end{table}
 
-\section{真实市场数据验证}\label{sec:market_validation}
-
-为验证三模型PINN在真实市场条件下的表现，本节使用第~\ref{sec:exp_data}节描述的SPY期权链数据，选取8个代表性到期日进行详细分析。表~\ref{tab:market_results}报告了五种方法相对市场价格的MAE（单位：美元）。
+为进一步验证三模型PINN在真实市场条件下的表现，本节使用第~\ref{sec:exp_data}节描述的SPY期权链数据，选取8个代表性到期日进行详细分析。表~\ref{tab:market_results}报告了五种方法相对市场价格的MAE（单位：美元）。
 
 \begin{table}[htbp]
   \centering
@@ -194,4 +177,4 @@
 
 \section{本章小结}\label{sec:exp_summary}
 
-三模型PINN（v16）在三大模型上均达到实用精度：BSM RelMAE$_\text{ATM}$=0.0009\%，CEV RelMAE$_\text{ATM}$=0.79\%，Heston RelMAE$_\text{ATM}$=0.599\%，三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。精度对比实验表明，三模型PINN在BSM和CEV上的精度优于参数化PINN，在Heston上参数化PINN略优，但三模型PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测表明：校准Heston在中长期期权上显著优于BSM；PINN-BSM在训练参数范围内具有优异的泛化能力；进一步的架构改进是重要的未来工作方向。
+三模型PINN（v16）在三大模型上均达到实用精度：BSM RelMAE$_\text{ATM}$=0.0009\%，CEV RelMAE$_\text{ATM}$=0.79\%，Heston RelMAE$_\text{ATM}$=0.599\%，三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。精度对比实验表明，三模型PINN在BSM和CEV上的精度优于参数化PINN，在Heston上参数化PINN略优，但三模型PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测表明，校准Heston在中长期期权上显著优于BSM，PINN-BSM在训练参数范围内具有优异的泛化能力，进一步的架构改进是重要的未来工作方向。
