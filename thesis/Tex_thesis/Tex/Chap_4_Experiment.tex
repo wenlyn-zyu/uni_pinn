@@ -1,10 +1,8 @@
 \chapter{实验评估与市场验证}\label{chap:experiment}
 
-\section{实验设置}\label{sec:exp_setup}
+\section{参数、数据集与评估指标}\label{sec:exp_setup}
 
-\subsection{模型参数}
-
-实验中使用的三大模型参数如表~\ref{tab:model_params}所示。
+实验中使用的三大模型参数如表~\ref{tab:model_params}所示，统一PINN的网络超参数如表~\ref{tab:hyperparams}所示。
 
 \begin{table}[htbp]
   \centering
@@ -27,10 +25,6 @@
     \hline
   \end{tabular}
 \end{table}
-
-\subsection{网络超参数}
-
-统一PINN的网络超参数如表~\ref{tab:hyperparams}所示。
 
 \begin{table}[htbp]
   \centering
@@ -57,21 +51,13 @@
   \end{tabular}
 \end{table}
 
-\subsection{参考解}
-
-评估时使用以下参考解：BSM采用Black-Scholes解析公式（精确解）；CEV采用Schroder非中心卡方分布解析解（精度约$10^{-15}$，由\texttt{scipy.stats.ncx2}计算）；Heston采用特征函数半解析法（Gil-Pelaez反演，精度约$10^{-4}$）。
-
-\subsection{评估指标}
-
-使用以下指标评估精度：
+评估时使用以下参考解：BSM采用Black-Scholes解析公式（精确解）；CEV采用Schroder非中心卡方分布解析解（精度约$10^{-15}$，由\texttt{scipy.stats.ncx2}计算）；Heston采用特征函数半解析法（Gil-Pelaez反演，精度约$10^{-4}$）。使用以下指标评估精度：
 \begin{align}
   \text{MAE} &= \frac{1}{N}\sum_{i=1}^N |\hat{V}_i - V_i^*|, \\
   \text{RMSE} &= \sqrt{\frac{1}{N}\sum_{i=1}^N (\hat{V}_i - V_i^*)^2}, \\
   \text{RelMAE}_\text{ATM} &= \frac{1}{|\mathcal{I}|}\sum_{i\in\mathcal{I}} \frac{|\hat{V}_i - V_i^*|}{|V_i^*|+\epsilon},
 \end{align}
-其中$\mathcal{I}=\{i: S_i\in[80,120]\}$为平值附近区域（ATM），$\epsilon=10^{-8}$为数值稳定项。相对误差仅在ATM区域计算，避免深度虚值区域（$V^*\approx 0$）导致的数值不稳定。
-
-对于涉及Hainaut和Casas\cite{hainaut2024heston}复现模型的Heston评估，MSE和RelMSE仅在$S/K\geq 0.85$的数据点上计算。原因在于：深度虚值CALL（$S/K<0.85$）对应深度实值PUT，Hainaut模型直接输出PUT价格，再经put-call parity转换为CALL价格；深度实值PUT的绝对价格较大，转换误差被同比例放大，若不加过滤则会不公平地主导整体指标，掩盖模型在平值和实值区域的真实精度。
+其中$\mathcal{I}=\{i: S_i\in[80,120]\}$为平值附近区域（ATM），$\epsilon=10^{-8}$为数值稳定项。相对误差仅在ATM区域计算，避免深度虚值区域（$V^*\approx 0$）导致的数值不稳定。对于涉及Hainaut和Casas\cite{hainaut2024heston}复现模型的Heston评估，MSE和RelMSE仅在$S/K\geq 0.85$的数据点上计算，原因在于深度虚值CALL对应深度实值PUT，Hainaut模型直接输出PUT价格再经put-call parity转换，深度实值PUT的绝对价格较大，转换误差被同比例放大，若不加过滤则会不公平地主导整体指标。
 
 \section{训练过程分析}\label{sec:training_analysis}
 
@@ -87,8 +73,6 @@
 训练过程呈现以下规律：PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。72个参数变体（6 BSM + 12 CEV + 54 Heston）的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
 
 \section{精度评估}\label{sec:accuracy}
-
-\subsection{整体精度}
 
 表~\ref{tab:accuracy}报告了统一PINN在三大模型上的精度评估结果（评估点$S\in[50,250]$，共50个均匀采样点）。
 
@@ -107,11 +91,7 @@
   \end{tabular}
 \end{table}
 
-三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。
-
-\subsection{价格曲线对比}
-
-图~\ref{fig:price_curves}展示了三大模型在$t=0$时的期权价格曲线，对比了统一PINN预测值与参考解。
+三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。图~\ref{fig:price_curves}展示了三大模型在$t=0$时的期权价格曲线，对比了统一PINN预测值与参考解。BSM的PINN预测与解析解高度吻合，误差主要集中在深度虚值区域（$S<70$）；CEV的PINN预测整体趋势正确，但在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，这与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域（$S>140$）。
 
 \begin{figure}[htbp]
   \centering
@@ -119,8 +99,6 @@
   \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。}
   \label{fig:price_curves}
 \end{figure}
-
-从价格曲线可以观察到：BSM的PINN预测与解析解高度吻合，误差主要集中在深度虚值区域（$S<70$）；CEV的PINN预测整体趋势正确，但在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，这与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域（$S>140$）。
 
 
 \section{推断速度}\label{sec:speed}
@@ -133,24 +111,9 @@
 
 \section{消融实验}\label{sec:ablation}
 
-为验证各设计组件的必要性，本节进行消融实验，逐一去除多模型PINN方法的关键组件，观察对精度的影响。
+为验证各设计组件的必要性，本节进行消融实验，逐一去除多模型PINN方法的关键组件，观察对精度的影响，结果汇总于表~\ref{tab:ablation}。
 
-\subsection{软掩码的作用}
-
-将软掩码替换为硬切换（即当$\xi=0$时完全使用BSM/CEV系数，当$\xi>0$时完全使用Heston系数），重新训练后发现：BSM精度大幅下降（MAE从0.0005变为2.2771）；Heston精度同样显著下降（MAE从0.102变为2.1289），且训练过程出现梯度爆炸，需要降低学习率才能稳定训练。
-这说明软掩码的连续插值特性对整体训练稳定性至关重要：硬切换在$\xi$附近产生不连续的梯度，导致网络难以同时优化BSM/CEV和Heston两种模式。
-
-\subsection{加法参数化的作用}
-
-将加法参数化替换为直接输出（网络直接预测期权价格，不加Black-Scholes基线），重新训练后发现：BSM精度大幅下降（MAE从0.0005变为1.8368）；Heston精度同样显著下降（MAE从0.102变为2.3083），深度虚值区域误差尤为突出。
-这验证了加法参数化的两个优势：良好的初始化（从Black-Scholes解析解出发）和深度虚值区域的稳定性。
-
-\subsection{数据锚点的作用}
-
-去除数据驱动锚点损失（$w_\text{data}=0$），仅使用PDE残差和边界条件约束，重新训练后发现：BSM精度下降（MAE从0.0005变为0.0144），且训练结果不稳定（不同随机种子下结果差异较大）；Heston精度显著下降（MAE从0.102变为0.4243）。
-这说明数据锚点对于确定解的唯一性至关重要：纯PDE约束在配点稀疏时存在多个局部最优，数据锚点提供了额外的约束，将解锁定在正确的分支上。
-
-消融实验结果汇总如表~\ref{tab:ablation}所示。
+将软掩码替换为硬切换（即当$\xi=0$时完全使用BSM/CEV系数，当$\xi>0$时完全使用Heston系数），重新训练后BSM精度大幅下降（MAE从0.0005变为2.2771），Heston精度同样显著下降（MAE从0.102变为2.1289），且训练过程出现梯度爆炸，需要降低学习率才能稳定训练。这说明软掩码的连续插值特性对整体训练稳定性至关重要：硬切换在$\xi$附近产生不连续的梯度，导致网络难以同时优化BSM/CEV和Heston两种模式。将加法参数化替换为直接输出（网络直接预测期权价格，不加Black-Scholes基线），重新训练后BSM精度大幅下降（MAE从0.0005变为1.8368），Heston精度同样显著下降（MAE从0.102变为2.3083），深度虚值区域误差尤为突出，验证了加法参数化在初始化和深度虚值稳定性两方面的优势。去除数据驱动锚点损失（$w_\text{data}=0$），仅使用PDE残差和边界条件约束，重新训练后BSM精度下降（MAE从0.0005变为0.0144），且训练结果不稳定；Heston精度显著下降（MAE从0.102变为0.4243），说明数据锚点对于确定解的唯一性至关重要：纯PDE约束在配点稀疏时存在多个局部最优，数据锚点提供了额外的约束，将解锁定在正确的分支上。
 
 \begin{table}[htbp]
   \centering
@@ -218,33 +181,9 @@
 
 \subsection{分析}
 
-\subsubsection{校准模型的层次结构}
+从表~\ref{tab:market_results}可以观察到以下规律。在短期期权（$T<0.15$年）上，BSM、CEV、Heston三个校准模型的MAE几乎相同（差距$<0.1$美元），说明短期期权的波动率微笑较平坦，三个模型的额外自由度对定价贡献有限，此区间BSM的计算效率优势最为突出。在中长期期权（$T>0.25$年）上，Heston明显优于BSM：以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%；Mar 19 2027（$T=0.847$）中，Heston MAE=\$0.19，而BSM MAE=\$3.77，体现了随机波动率模型在中长期期权定价中的优势。Sep 30 2026和Dec 31 2026两个到期日的校准模型MAE均高达2至3美元，高于相邻到期日，可能与季末和年末流动性变化、市场微结构噪声有关，属于市场特殊情况，不影响整体结论。
 
-\textbf{短期期权（$T<0.15$年）}：BSM、CEV、Heston三个校准模型的MAE几乎相同（差距$<0.1$美元），说明短期期权的波动率微笑较平坦，三个模型的额外自由度对定价贡献有限。在此区间，BSM的计算效率优势最为突出。
-
-\textbf{中长期期权（$T>0.25$年）}：Heston明显优于BSM。以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%；Mar 19 2027（$T=0.847$）中，Heston MAE=\$0.19，而BSM MAE=\$3.77，Heston仅为BSM的5\%。这体现了随机波动率模型在中长期期权定价中的优势：随着到期时间延长，波动率的随机性不可忽略，Heston模型通过$\kappa,\theta,\xi,\rho$四个参数能够更准确地拟合波动率曲面的期限结构。
-
-\textbf{异常点（Sep 30 2026，$T=0.381$；Dec 31 2026，$T=0.633$）}：这两个到期日的三个校准模型MAE均高达2至3美元，高于相邻到期日。Sep 30的高误差可能与季末流动性变化有关；Dec 31的高误差可能与年末流动性下降、市场微结构噪声或该到期日合约数量较多（$n=151$）导致的参数校准困难有关，属于市场特殊情况，不影响整体结论。
-
-\subsubsection{PINN-BSM的泛化能力}
-
-PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力。v16版本的BSM训练参数覆盖$\sigma\in[0.10,0.35]$，而真实市场的$\sigma^*$在0.13至0.25之间，恰好落在训练范围内，因此PINN-BSM能够精确复现校准BSM的定价结果，验证了本文方法的参数泛化性。
-
-\subsubsection{参数化PINN的市场表现}
-
-参数化PINN在中长期期权（$T>0.5$年）上的MAE（0.99至6.61美元）显著低于统一PINN-Heston（4.98至8.93美元），说明更宽的训练参数范围（$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$）对真实市场参数的覆盖更好。然而，在短期期权（$T<0.3$年）上，参数化PINN的MAE（11至42美元）仍远高于校准Heston（0.13至0.34美元），说明即使扩大训练范围，PINN方法在真实市场参数下的泛化能力仍受限于网络容量和参数域覆盖。
-
-\subsubsection{PINN-Heston的局限性分析}
-
-PINN-Heston的MAE显著高于校准Heston（高出5至73美元），这是本实验最重要的发现之一，需要深入分析其原因。
-
-\textbf{（1）参数域外推。}v16版本的Heston训练参数范围为$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$，$\rho\in[-0.7,-0.5]$。然而，SPY期权校准得到的Heston参数常超出此范围：$\kappa$可高达10至20（快速均值回归），$\xi$可高达2.1（高vol-of-vol），$\rho$可接近$-0.67$（强杠杆效应）。参数域外推导致PINN-Heston的预测严重偏离真实值。
-
-\textbf{（2）价格尺度不匹配。}统一PINN以$S=100$为基准训练，真实SPY价格$S=739.75$，归一化后$K'=100\cdot K/739.75$，行权价范围约为$[85,115]$，与训练域一致。然而，Heston模型的价格对$v_0$（初始方差）极为敏感，而$v_0$的归一化处理（$v'=v/v_\text{max}$，$v_\text{max}=1$）在真实市场参数下可能引入额外误差。
-
-\textbf{（3）网络容量瓶颈。}BSM仅有1个参数（$\sigma$），CEV有2个（$\sigma,\beta$），而Heston有5个（$\kappa,\theta,\xi,\rho,v_0$）。统一PINN用同一个6层128宽的网络同时拟合三种模型，Heston的高维参数空间对网络容量要求远高于BSM/CEV，是PINN-Heston泛化能力不足的根本原因。
-
-上述分析表明，PINN-Heston在当前方法框架下存在根本性局限，需要从架构层面入手加以解决，留作未来工作（见第~\ref{sec:limitations}节）。
+PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力，验证了本文方法的参数泛化性。参数化PINN在中长期期权（$T>0.5$年）上的MAE显著低于统一PINN-Heston，说明更宽的训练参数范围对真实市场参数的覆盖更好；然而在短期期权（$T<0.3$年）上，参数化PINN的MAE仍远高于校准Heston，说明即使扩大训练范围，PINN方法在真实市场参数下的泛化能力仍受限于网络容量和参数域覆盖。PINN-Heston的MAE显著高于校准Heston（高出5至73美元），根本原因在于三方面：一是参数域外推，v16版本的Heston训练参数范围（$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$，$\rho\in[-0.7,-0.5]$）无法覆盖SPY期权校准得到的极端参数（$\kappa$可高达10至20，$\xi$可高达2.1）；二是价格尺度不匹配，真实SPY价格$S=739.75$，归一化处理在真实市场参数下可能引入额外误差；三是网络容量瓶颈，Heston的5维参数空间对网络容量要求远高于BSM/CEV，统一PINN用同一个网络同时拟合三种模型存在根本性局限，需要从架构层面入手加以解决，留作未来工作（见第~\ref{sec:limitations}节）。
 
 
 
@@ -307,14 +246,9 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
 
 \section{Greeks计算}\label{sec:greeks}
 
-PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额外推导。
-本节验证统一PINN计算的Delta、Gamma、Vega与解析/有限差分参考值的一致性。
+PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额外推导。本节验证统一PINN计算的Delta、Gamma、Vega与解析/有限差分参考值的一致性。
 
-\subsection{BSM Greeks}
-
-对BSM模型，Delta和Gamma通过对$S$的自动微分计算，Vega通过对$\sigma$的有限差分计算（步长$h=0.001$）。
-参考值为Black-Scholes解析公式。
-评估点取$S\in\{90,100,110\}$（虚值、平值、实值），$t=0$，$\sigma\in\{0.13,0.17,0.20,0.25\}$。
+对BSM模型，Delta和Gamma通过对$S$的自动微分计算，Vega通过对$\sigma$的有限差分计算（步长$h=0.001$），参考值为Black-Scholes解析公式，评估点取$S\in\{90,100,110\}$，$t=0$，$\sigma\in\{0.13,0.17,0.20,0.25\}$。BSM Greeks的平均相对误差均低于0.2\%（Delta 0.03\%，Gamma 0.13\%，Vega 0.09\%），表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
 
 \begin{table}[htbp]
   \centering
@@ -331,13 +265,7 @@ PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额�
   \end{tabular}
 \end{table}
 
-BSM Greeks的平均相对误差均低于0.2\%，表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
-
-\subsection{Heston Greeks}
-
-Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心有限差分计算。
-Delta和Gamma对$S$差分，Vega对$v_0$差分。
-评估参数：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。
+Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心有限差分计算，评估参数：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高（11.41\%），主要集中在高均值回归速度（$\kappa=5$）和高vol-of-vol（$\xi=0.5$）的极端参数区域，这些区域PDE系数变化剧烈，二阶导数的数值精度本身也受有限差分步长影响。在基准参数设置下，Delta误差约0.56\%，Gamma误差约9.93\%，与文献中同类工作的精度水平相当。
 
 \begin{table}[htbp]
   \centering
@@ -352,8 +280,6 @@ Delta和Gamma对$S$差分，Vega对$v_0$差分。
     \hline
   \end{tabular}
 \end{table}
-
-Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高（11.41\%），主要集中在高均值回归速度（$\kappa=5$）和高vol-of-vol（$\xi=0.5$）的极端参数区域，这些区域PDE系数变化剧烈，二阶导数的数值精度本身也受有限差分步长影响。在基准参数设置（$\kappa=2.0$，$\xi=0.3$，$\rho=-0.7$）下，Delta误差约0.56\%，Gamma误差约9.93\%，与文献中同类工作的精度水平相当。
 
 \section{本章小结}\label{sec:exp_summary}
 

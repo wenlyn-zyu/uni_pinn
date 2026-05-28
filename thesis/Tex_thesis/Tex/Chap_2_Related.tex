@@ -1,4 +1,4 @@
-\chapter{相关工作}\label{chap:related}
+\chapter{相关背景}\label{chap:related}
 
 \section{期权定价模型}\label{sec:option_models}
 
@@ -57,8 +57,6 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
 
 \section{物理信息神经网络}\label{sec:pinn}
 
-\subsection{基本原理}
-
 物理信息神经网络（PINN）由Raissi等人\cite{raissi2019physics}于2019年提出，其核心思想是将PDE残差直接嵌入神经网络的损失函数。对于PDE $\mathcal{F}[u]=0$，PINN的总损失为：
 \begin{equation}\label{eq:pinn_loss}
   \mathcal{L} = w_{\text{pde}}\mathcal{L}_{\text{pde}}
@@ -67,11 +65,7 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
 \end{equation}
 其中各项分别为配点处的PDE残差、初值条件和边界条件的均方误差，$w_{\text{pde}},w_{\text{ic}},w_{\text{bc}}$为权重超参数。PDE残差通过自动微分精确计算，无需有限差分近似。PINN无需网格剖分，训练完成后对任意输入的推断时间约为毫秒级。
 
-\subsection{PINN在期权定价中的应用}
-
-Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络（gated network）结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，将模型参数$(\kappa,\theta,\xi,\rho)$与合约特征$(S,v,t,T,r)$联合作为网络输入，实现了训练一次、多参数组合即时定价；该模型以PUT期权为输出，通过put-call parity转换为CALL价格。本文将其作为参数化Heston PINN的对比基准，在第~\ref{sec:compare}节中对其进行复现与评估。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。
-
-上述参数化PINN工作的共同思路是将模型参数直接作为网络输入，使单个网络覆盖整个参数空间。然而，现有参数化PINN均针对单一定价模型（BSM、CEV或Heston之一），不同模型之间的PDE结构差异（一维vs二维、常数扩散系数vs随机扩散系数）使得跨模型统一存在本质困难。本文在此基础上，通过软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现了真正意义上的多模型统一框架。
+在期权定价领域，Dhiman和Hu\cite{dhiman2023pinn}率先将PINN应用于欧式和美式期权定价，提出了门控网络结构，通过浅层分支与深层分支的加权组合分别捕捉解的简单特征与复杂特征。Zamxaka\cite{zamxaka2023cev}系统研究了PINN对BSM和CEV模型的求解，构建了参数化PINN，使单个网络可在不同参数设置下直接推断期权价格。针对Heston模型，Hainaut和Casas\cite{hainaut2024heston}构建了参数化PINN，将模型参数与合约特征联合作为网络输入，实现了训练一次、多参数组合即时定价；该模型以PUT期权为输出，通过put-call parity转换为CALL价格，本文将其作为参数化Heston PINN的对比基准。Guo等人\cite{guo2024icpinn}提出了改进约束PINN（ICPINN），通过输出变换将终值条件硬编码进网络结构，减少损失函数中的冲突项，加速收敛。上述参数化PINN工作的共同思路是将模型参数直接作为网络输入，使单个网络覆盖整个参数空间；然而，现有参数化PINN均针对单一定价模型，不同模型之间的PDE结构差异使得跨模型统一存在本质困难。本文在此基础上，通过软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现了真正意义上的多模型统一框架。
 
 \subsection{三种独立PINN的复现与基准建立}\label{subsec:reproduction}
 
@@ -116,4 +110,4 @@ Liu等人\cite{liu2025pdeagent}提出了PDE-AGENT，一个工具链增强的多�
 
 \section{本章小结}\label{sec:related_summary}
 
-本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式，回顾了PINN在期权定价中的代表性工作，并介绍了LLM辅助科学计算的进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。本文在此基础上构建了LLM与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}章。
+本章梳理了BSM、CEV、Heston三大期权定价模型的PDE形式，回顾了物理信息神经网络在期权定价中的代表性工作，并介绍了大语言模型辅助科学计算的进展。现有PINN工作验证了神经网络求解期权定价PDE的可行性，但缺乏统一的多模型框架和自然语言交互能力。本文在此基础上构建了大语言模型与PINN相结合的统一期权定价系统，具体方法见第~\ref{chap:method}章。

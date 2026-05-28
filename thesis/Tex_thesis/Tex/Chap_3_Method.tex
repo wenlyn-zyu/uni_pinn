@@ -1,4 +1,4 @@
-\chapter{统一PINN期权定价方法设计}\label{chap:method}
+\chapter{基于大模型和PINN的三模型期权求解方式}\label{chap:method}
 
 本章介绍多模型统一PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
 
@@ -9,20 +9,16 @@
   \label{fig:architecture}
 \end{figure}
 
-\section{三大期权定价模型}\label{sec:three_models}
+\section{基于PDE方程的期权定价模型}\label{sec:three_models}
 
-本文涉及的三大期权定价模型已在第~\ref{sec:option_models}节详细介绍，此处仅概述各模型对统一框架设计的关键影响。BSM模型（式~\eqref{eq:bsm}）以常数波动率$\sigma$为唯一随机性来源，存在封闭解析解，本文将其作为加法参数化的基线：
+本文涉及的三大期权定价模型均以偏微分方程为核心，其结构差异正是统一框架设计的出发点。BSM模型（式~\eqref{eq:bsm}）以常数波动率$\sigma$为唯一随机性来源，存在封闭解析解，本文将其作为加法参数化的基线：
 \begin{align}
   V_\text{BS}(S,\tau;\sigma) &= S\Phi(d_1) - Ke^{-r\tau}\Phi(d_2), \label{eq:bs_formula_ch3}\\
   d_1 &= \frac{\ln(S/K)+(r+\sigma^2/2)\tau}{\sigma\sqrt{\tau}}, \quad d_2 = d_1 - \sigma\sqrt{\tau}.
 \end{align}
-CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$，本文取$\beta=0.5$，以Schroder非中心卡方解析解作为数据锚点。Heston模型（式~\eqref{eq:heston}）引入随机方差$v$，PDE升至二维，以特征函数半解析解作为数据锚点。三个模型的PDE在扩散系数结构上的差异，正是统一算子设计的出发点。
+CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$，本文取$\beta=0.5$，以Schroder非中心卡方解析解作为数据锚点。Heston模型（式~\eqref{eq:heston}）引入随机方差$v$，PDE升至二维，以特征函数半解析解作为数据锚点。
 
-\section{统一PDE算子}\label{sec:unified_pde}
-
-\subsection{三大模型的PDE统一形式}
-
-BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
+三大模型的PDE均可写为如下统一算子：
 \begin{equation}\label{eq:unified_pde}
   \mathcal{F}[V] =
     \frac{\partial V}{\partial t}
@@ -50,11 +46,7 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
   \end{tabular}
 \end{table}
 
-当$\xi=0$时，$b=c=d=0$，统一算子自动退化为一维BSM/CEV方程；当$\xi>0$时，交叉项和$v$方向扩散项被激活，对应Heston的二维随机波动率结构。
-
-\subsection{软掩码机制}
-
-为实现三大模型之间的连续插值，本文引入软掩码：
+当$\xi=0$时，$b=c=d=0$，统一算子自动退化为一维BSM/CEV方程；当$\xi>0$时，交叉项和$v$方向扩散项被激活，对应Heston的二维随机波动率结构。为实现三大模型之间的连续插值，本文引入软掩码：
 \begin{equation}\label{eq:soft_mask}
   \text{mask} = \tanh\!\left(\frac{\xi}{0.05}\right)^2.
 \end{equation}
@@ -73,7 +65,9 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 软掩码的连续插值特性使网络可以学习到平滑的参数依赖关系，避免了硬切换在$\xi$附近产生的梯度不连续问题（消融实验见第~\ref{sec:ablation}节）。
 
-\section{加法参数化输出}\label{sec:additive_param}
+\section{训练方法}\label{sec:training}
+
+\subsection{网络架构与加法参数化输出}
 
 直接用神经网络输出期权价格存在两个问题：初始化困难（随机初始化的网络输出量级约为$10^{-1}$，而期权价格量级约为$10^0$至$10^2$）；以及深度虚值退化（乘法参数化$V=V_\text{BS}\cdot(1+\text{net})$在$V_\text{BS}\to 0$时退化）。为此，本文采用加法参数化输出：
 \begin{equation}\label{eq:additive}
@@ -85,31 +79,15 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 \end{equation}
 网络最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，使训练开始时$K\cdot\text{net}\approx 0$，网络从接近正确答案的位置开始优化。深度虚值时$V_\text{BS}\to 0$，但$K\cdot\text{net}$仍可输出非零修正，网络可以学习到CEV/Heston相对于BSM的价格差异。
 
-\section{网络架构}\label{sec:architecture}
-
-\subsection{输入特征}
-
-网络输入为9维向量：
-\begin{equation}
-  x = \left[\frac{S}{S_\text{max}},\; \frac{v}{v_\text{max}},\; \frac{t}{T},\; \sigma,\; \beta,\; \kappa,\; \theta,\; \xi,\; \rho\right],
-\end{equation}
-其中$S_\text{max}=300$，$v_\text{max}=1$。归一化使各输入均落在$[0,1]$区间，避免不同量级的输入导致梯度不平衡。
-
-\subsection{网络结构}
-
-网络采用6层全连接结构，每层128个神经元，激活函数为$\tanh$：
+网络输入为9维向量$x = \left[\frac{S}{S_\text{max}},\; \frac{v}{v_\text{max}},\; \frac{t}{T},\; \sigma,\; \beta,\; \kappa,\; \theta,\; \xi,\; \rho\right]$，其中$S_\text{max}=300$，$v_\text{max}=1$，归一化使各输入均落在$[0,1]$区间，避免不同量级的输入导致梯度不平衡。网络采用6层全连接结构，每层128个神经元，激活函数为$\tanh$：
 \begin{align}
   h_0 &= x \in \mathbb{R}^9, \\
   h_l &= \tanh(W_l h_{l-1} + b_l), \quad l=1,\ldots,6, \\
   \text{net}(x) &= W_7 h_6 + b_7 \in \mathbb{R}.
 \end{align}
-最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，偏置初始化为0，确保训练开始时$\text{net}\approx 0$。$\tanh$激活函数光滑且高阶导数有界，适合PINN中需要计算二阶偏导数的场景。
+最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，偏置初始化为0，确保训练开始时$\text{net}\approx 0$。$\tanh$激活函数光滑且高阶导数有界，适合PINN中需要计算二阶偏导数的场景。当$t=T$时，$\tau=T-t=0$，Black-Scholes公式自动退化为终值条件$V_\text{BS}(S,0;\sigma_\text{eff})=\max(S-K,0)$；同时，网络最后一层的小初始化确保修正量$K\cdot\text{net}$在训练初期接近0，不破坏终值条件的满足，这一设计参考了Guo等人\cite{guo2024icpinn}的ICPINN方法。
 
-\subsection{终值条件的近似硬约束}
-
-当$t=T$时，$\tau=T-t=0$，Black-Scholes公式自动退化为终值条件$V_\text{BS}(S,0;\sigma_\text{eff})=\max(S-K,0)$；同时，网络最后一层的小初始化确保修正量$K\cdot\text{net}$在训练初期接近0，不破坏终值条件的满足。这一设计参考了Guo等人\cite{guo2024icpinn}的ICPINN方法。
-
-\section{损失函数}\label{sec:loss}
+\subsection{损失函数与配点采样}
 
 统一PINN的总损失由PDE残差、边界条件和数据锚点三部分组成：
 \begin{equation}\label{eq:total_loss}
@@ -118,48 +96,21 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
                       + w_\text{data}\,\mathcal{L}_\text{data}.
 \end{equation}
 
-\subsection{配点采样}\label{subsec:collocation}
+配点是PINN训练的核心数据来源，完全由求解域的几何结构决定，无需任何真实市场观测数据。对每个参数变体在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内均匀随机采样$N_c=5000$个配点，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。对于BSM/CEV模型，$v$维度退化为常数，配点实际为二维；对于Heston模型，配点为完整三维。边界配点在各边界面上均匀采样$N_b=500$个点。数据锚点在$t=0$处取$N_d=20$个均匀分布的$S$值，对应价格由参考解析解预先计算，这是训练中唯一涉及"真实"（解析）价格的部分。
 
-配点（collocation points）是PINN训练的核心数据来源，完全由求解域的几何结构决定，无需任何真实市场观测数据。具体地，对每个参数变体在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内均匀随机采样$N_c=5000$个配点$\{(S_i,v_i,t_i)\}_{i=1}^{N_c}$，其中$S_\text{max}=300$，$v_\text{max}=1$，$T=1$。每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。对于BSM/CEV模型，$v$维度退化为常数（$v=\sigma^2$），配点实际为二维；对于Heston模型，配点为完整三维。边界配点在各边界面上均匀采样$N_b=500$个点。数据锚点在$t=0$处取$N_d=20$个均匀分布的$S$值，对应价格由参考解析解预先计算（BSM用Black-Scholes公式，CEV用Schroder非中心卡方解析解，Heston用特征函数半解析解），这是训练中唯一涉及"真实"（解析）价格的部分。
-
-\subsection{PDE残差损失}
-
-在求解域内随机采样$N_c$个配点$\{(S_i,v_i,t_i)\}$，计算统一PDE算子的相对残差：
+PDE残差损失在求解域内随机采样$N_c$个配点，计算统一PDE算子的相对残差：
 \begin{equation}
   \mathcal{L}_\text{pde} = \frac{1}{N_c}\sum_{i=1}^{N_c}
     \left(\frac{\mathcal{F}[\hat{V}](S_i,v_i,t_i)}{|\hat{V}(S_i,v_i,t_i)|+1}\right)^2.
 \end{equation}
-分母中的$|\hat{V}|+1$为相对残差归一化项，避免ATM区域的残差主导损失，使OTM区域也能获得足够的梯度信号。
-
-\subsection{边界条件损失}
-
-边界条件设置为：
-\begin{align}
-  V(0,v,t) &= 0, \label{eq:bc_lower} \\
-  V(S_\text{max},v,t) &= S_\text{max} - Ke^{-r(T-t)}, \label{eq:bc_upper} \\
-  V(S,v_\text{max},t) &\approx S. \label{eq:bc_vmax}
-\end{align}
-边界条件损失为：
-\begin{equation}
-  \mathcal{L}_\text{bc} = \frac{1}{N_b}\sum_{k=1}^{N_b}
-    \left|\hat{V}(S_k,v_k,t_k) - g(S_k,v_k,t_k)\right|^2,
-\end{equation}
-其中$g$为对应边界的目标值。
-
-\subsection{数据驱动锚点损失}
-
-纯PDE约束存在解不唯一的数值问题。本文在$t=0$处预计算参考解（BSM用解析解，CEV用Schroder非中心卡方解析解，Heston用特征函数半解析解），作为数据驱动锚点：
+分母中的$|\hat{V}|+1$为相对残差归一化项，避免ATM区域的残差主导损失，使OTM区域也能获得足够的梯度信号。边界条件设置为$V(0,v,t)=0$，$V(S_\text{max},v,t)=S_\text{max}-Ke^{-r(T-t)}$，$V(S,v_\text{max},t)\approx S$，边界条件损失为对应边界目标值的均方误差。纯PDE约束存在解不唯一的数值问题，数据驱动锚点损失在$t=0$处以参考解析解为目标：
 \begin{equation}
   \mathcal{L}_\text{data} = \frac{1}{N_d}\sum_{j=1}^{N_d}
     \left(\hat{V}(S_j,v_j,0) - V_j^*\right)^2,
 \end{equation}
-其中$V_j^*$为参考解，$N_d=20$（每个模型各20个点）。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{data})=(1, 10, 100)$，其中$w_\text{data}=100$确保网络在已知解处精确拟合，防止PDE约束将解推向错误方向；消融实验验证了此权重组合的必要性（见第~\ref{sec:ablation}节）。
+其中$V_j^*$为参考解。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{data})=(1, 10, 100)$，其中$w_\text{data}=100$确保网络在已知解处精确拟合，防止PDE约束将解推向错误方向；消融实验验证了此权重组合的必要性（见第~\ref{sec:ablation}节）。
 
-\section{训练策略}\label{sec:training}
-
-训练时对72个参数变体（6 BSM + 12 CEV + 54 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。
-
-使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$）。总训练轮数30000轮，在NVIDIA GPU上约需1小时。配点在求解域内均匀随机采样，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。损失权重设置为$(w_\text{pde}, w_\text{bc}, w_\text{data})=(1, 10, 100)$。
+训练时对72个参数变体（6 BSM + 12 CEV + 54 Heston）同时采样配点：每个训练步骤中，每个参数变体各采样5000个配点，拼接后计算统一PDE残差。这一策略确保网络在三种模型的参数空间中均匀训练，避免某一模型主导损失。使用Adam优化器\cite{kingma2014adam}，初始学习率$10^{-3}$，余弦退火学习率调度（$\eta_\text{min}=10^{-5}$），总训练轮数30000轮，在NVIDIA GPU上约需1小时。
 
 \section{LLM路由层}\label{sec:llm_router}
 
@@ -189,4 +140,4 @@ BSM、CEV、Heston三大模型的PDE均可写为如下统一算子：
 
 \section{本章小结}\label{sec:method_summary}
 
-本章介绍了基于PINN的多模型期权定价方法。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。
+本章介绍了基于大模型和PINN的三模型期权求解方式。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现模型间的连续插值；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。
