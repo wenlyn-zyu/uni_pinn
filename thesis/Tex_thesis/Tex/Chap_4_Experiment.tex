@@ -1,6 +1,6 @@
 \chapter{实验评估与市场验证}\label{chap:experiment}
 
-\section{参数、数据集与评估指标}\label{sec:exp_setup}
+\section{实验参数}\label{sec:exp_params}
 
 实验中使用的三大模型参数如表~\ref{tab:model_params}所示，统一PINN的网络超参数如表~\ref{tab:hyperparams}所示。
 
@@ -51,63 +51,21 @@
   \end{tabular}
 \end{table}
 
-评估时使用以下参考解：BSM采用Black-Scholes解析公式（精确解）；CEV采用Schroder非中心卡方分布解析解（精度约$10^{-15}$，由\texttt{scipy.stats.ncx2}计算）；Heston采用特征函数半解析法（Gil-Pelaez反演，精度约$10^{-4}$）。使用以下指标评估精度：
+\section{数据集}\label{sec:exp_data}
+
+实验在两类数据集上进行评估。合成数据集基于72组参数变体（6 BSM + 12 CEV + 54 Heston）生成，评估点取$S\in[50,250]$共50个均匀采样点，参考解由各模型的解析解或半解析解预先计算：BSM采用Black-Scholes解析公式（精确解）；CEV采用Schroder非中心卡方分布解析解（精度约$10^{-15}$，由\texttt{scipy.stats.ncx2}计算）；Heston采用特征函数半解析法（Gil-Pelaez反演，精度约$10^{-4}$）。
+
+真实市场数据集使用CBOE提供的SPY（标普500 ETF）期权链数据（下载日期：2026年5月11日，SPY现价$S=739.75$美元），无风险利率取美国1年期国债收益率$r=4.3\%$。对每个到期日，筛选满足以下条件的看涨合约：隐含波动率$\text{IV}\in(1\%, 200\%)$且最新成交价$>0.10$美元；行权价$K\in[0.85S,\,1.15S]$（ATM $\pm15\%$），确保Heston特征函数数值积分的稳定性。共筛选出23个到期日，覆盖$T\in[0.06, 2.59]$年的宽泛时间跨度，总计2824个合约。
+
+\section{评估指标}\label{sec:exp_metrics}
+
+使用以下指标评估精度：
 \begin{align}
   \text{MAE} &= \frac{1}{N}\sum_{i=1}^N |\hat{V}_i - V_i^*|, \\
   \text{RMSE} &= \sqrt{\frac{1}{N}\sum_{i=1}^N (\hat{V}_i - V_i^*)^2}, \\
   \text{RelMAE}_\text{ATM} &= \frac{1}{|\mathcal{I}|}\sum_{i\in\mathcal{I}} \frac{|\hat{V}_i - V_i^*|}{|V_i^*|+\epsilon},
 \end{align}
-其中$\mathcal{I}=\{i: S_i\in[80,120]\}$为平值附近区域（ATM），$\epsilon=10^{-8}$为数值稳定项。相对误差仅在ATM区域计算，避免深度虚值区域（$V^*\approx 0$）导致的数值不稳定。对于涉及Hainaut和Casas\cite{hainaut2024heston}复现模型的Heston评估，MSE和RelMSE仅在$S/K\geq 0.85$的数据点上计算，原因在于深度虚值CALL对应深度实值PUT，Hainaut模型直接输出PUT价格再经put-call parity转换，深度实值PUT的绝对价格较大，转换误差被同比例放大，若不加过滤则会不公平地主导整体指标。
-
-\section{训练过程分析}\label{sec:training_analysis}
-
-图~\ref{fig:training_loss}展示了统一PINN（v16）的训练损失曲线。
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
-  \caption{统一PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
-  \label{fig:training_loss}
-\end{figure}
-
-训练过程呈现以下规律：PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。72个参数变体（6 BSM + 12 CEV + 54 Heston）的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
-
-\section{精度评估}\label{sec:accuracy}
-
-表~\ref{tab:accuracy}报告了统一PINN在三大模型上的精度评估结果（评估点$S\in[50,250]$，共50个均匀采样点）。
-
-\begin{table}[htbp]
-  \centering
-  \caption{统一PINN（v16）在三大模型上的精度评估}
-  \label{tab:accuracy}
-  \begin{tabular}{lccc}
-    \hline
-    模型 & MAE & RelMAE$_\text{ATM}$ \\
-    \hline
-    BSM & 0.0005 & 0.0009\% \\
-    CEV ($\beta=0.5$) & 0.032 & 0.79\% \\
-    Heston & 0.102 & 0.599\% \\
-    \hline
-  \end{tabular}
-\end{table}
-
-三大模型的精度均达到实用水平。BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。图~\ref{fig:price_curves}展示了三大模型在$t=0$时的期权价格曲线，对比了统一PINN预测值与参考解。BSM的PINN预测与解析解高度吻合，误差主要集中在深度虚值区域（$S<70$）；CEV的PINN预测整体趋势正确，但在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，这与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域（$S>140$）。
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{Img/price_curves.pdf}
-  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。}
-  \label{fig:price_curves}
-\end{figure}
-
-
-\section{推断速度}\label{sec:speed}
-
-统一PINN的推断速度在GPU上约为2ms，CPU上约为8ms（单次定价，批量输入），能够同时支持三种模型，无需针对不同参数重新计算。
-
-\section{LLM路由层评估}\label{sec:llm_eval}
-
-设计了20个测试用例，覆盖三种模型和中英文输入，LLM路由层实现了100\%的模型选择准确率（20/20），所有数值参数均被正确提取，缺失参数均使用了合理的默认值。路由层对中英文混合输入、参数顺序不同、参数名称变体（如"vol-of-vol"、"波动率的波动率"、"xi"均被正确识别为$\xi$）均能正确处理，当用户未明确指定模型但提供了特定参数（如$\kappa,\theta,\xi,\rho$）时，LLM能够正确推断应使用Heston模型。
+其中$\mathcal{I}=\{i: S_i\in[80,120]\}$为平值附近区域（ATM），$\epsilon=10^{-8}$为数值稳定项。相对误差仅在ATM区域计算，避免深度虚值区域（$V^*\approx 0$）导致的数值不稳定。对于涉及Hainaut和Casas\cite{hainaut2024heston}复现模型的Heston评估，指标仅在$S/K\geq 0.85$的数据点上计算，原因在于深度虚值CALL对应深度实值PUT，Hainaut模型直接输出PUT价格再经put-call parity转换，深度实值PUT的绝对价格较大，转换误差被同比例放大，若不加过滤则会不公平地主导整体指标。
 
 \section{消融实验}\label{sec:ablation}
 
@@ -131,7 +89,44 @@
   \end{tabular}
 \end{table}
 
-消融实验表明，三个设计组件均对最终精度有显著贡献。软掩码和加法参数化的影响最为突出：去除任一组件后，BSM和Heston的MAE均上升至1.8以上，说明两者共同构成了统一框架稳定训练的基础。数据锚点的影响相对温和但不可忽视：去除后BSM MAE上升约29倍（0.0005→0.0144），Heston MAE上升约4倍（0.102→0.4243），说明锚点对于确定解的唯一性和收敛稳定性均有重要作用。
+消融实验表明，三个设计组件均对最终精度有显著贡献。软掩码和加法参数化的影响最为突出：去除任一组件后，BSM和Heston的MAE均上升至1.8以上，说明两者共同构成了统一框架稳定训练的基础。数据锚点的影响相对温和但不可忽视：去除后BSM MAE上升约29倍，Heston MAE上升约4倍，说明锚点对于确定解的唯一性和收敛稳定性均有重要作用。
+
+\section{实验结果}\label{sec:results}
+
+图~\ref{fig:training_loss}展示了统一PINN的训练损失曲线。PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。72个参数变体的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
+  \caption{统一PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
+  \label{fig:training_loss}
+\end{figure}
+
+表~\ref{tab:accuracy}报告了统一PINN在三大模型上的精度评估结果（评估点$S\in[50,250]$，共50个均匀采样点）。三大模型的精度均达到实用水平：BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。图~\ref{fig:price_curves}展示了三大模型在$t=0$时的期权价格曲线，BSM的PINN预测与解析解高度吻合；CEV在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域。
+
+\begin{table}[htbp]
+  \centering
+  \caption{统一PINN（v16）在三大模型上的精度评估}
+  \label{tab:accuracy}
+  \begin{tabular}{lccc}
+    \hline
+    模型 & MAE & RelMAE$_\text{ATM}$ \\
+    \hline
+    BSM & 0.0005 & 0.0009\% \\
+    CEV ($\beta=0.5$) & 0.032 & 0.79\% \\
+    Heston & 0.102 & 0.599\% \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{Img/price_curves.pdf}
+  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。}
+  \label{fig:price_curves}
+\end{figure}
+
+统一PINN的推断速度在GPU上约为2ms，CPU上约为8ms（单次定价，批量输入），能够同时支持三种模型，无需针对不同参数重新计算。大语言模型路由层设计了覆盖三种模型和中英文输入的测试用例，所有数值参数均被正确提取，缺失参数均使用了合理的默认值。路由层对中英文混合输入、参数顺序不同、参数名称变体均能正确处理，当用户未明确指定模型但提供了特定参数（如$\kappa,\theta,\xi,\rho$）时，大语言模型能够正确推断应使用Heston模型。
 
 \section{真实市场数据验证}\label{sec:market_validation}
 
@@ -208,7 +203,7 @@ PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），�
   \end{tabular}
 \end{table}
 
-Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN复现，以PUT期权为输出，通过put-call parity转换为CALL价格；评估参数$\theta=0.04$略低于其训练下限$0.062$，属于轻微超出训练范围的情形。Heston评估仅保留$S/K\geq 0.85$的数据点（原因见第~\ref{sec:exp_setup}节）。参数化PINN（第~\ref{sec:parametric_pinn}节）在更宽的参数范围内训练，网络容量为统一PINN的约4倍（8层$\times$256）。
+Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN复现，以PUT期权为输出，通过put-call parity转换为CALL价格；评估参数$\theta=0.04$略低于其训练下限$0.062$，属于轻微超出训练范围的情形。Heston评估仅保留$S/K\geq 0.85$的数据点（原因见第~\ref{sec:exp_metrics}节）。参数化PINN（第~\ref{sec:parametric_pinn}节）在更宽的参数范围内训练，网络容量为统一PINN的约4倍（8层$\times$256）。
 
 \begin{table}[htbp]
   \centering
@@ -283,4 +278,4 @@ Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心
 
 \section{本章小结}\label{sec:exp_summary}
 
-统一PINN（v16）在三大模型上均达到实用精度：BSM RelMAE$_\text{ATM}$=0.0009\%，CEV RelMAE$_\text{ATM}$=0.79\%，Heston RelMAE$_\text{ATM}$=0.599\%，三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。LLM路由层在20个测试用例上实现了100\%的模型选择准确率。精度对比实验表明，统一PINN在BSM和CEV上的精度优于参数化PINN，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测（SPY期权链，2824个合约，23个到期日，详细分析8个代表性到期日）表明：校准Heston在中长期期权上显著优于BSM，以Aug 21 2026为例，Heston MAE=\$0.13，BSM MAE=\$1.64；PINN-BSM在训练参数范围内具有优异的泛化能力；参数化PINN在中长期期权上的市场误差低于统一PINN-Heston，但两者在短期期权上均因参数域外推而误差较大，进一步的架构改进是重要的未来工作方向。
+统一PINN（v16）在三大模型上均达到实用精度：BSM RelMAE$_\text{ATM}$=0.0009\%，CEV RelMAE$_\text{ATM}$=0.79\%，Heston RelMAE$_\text{ATM}$=0.599\%，三种模型的ATM相对误差均低于1\%。消融实验验证了软掩码、加法参数化和数据锚点三个设计组件的必要性。精度对比实验表明，统一PINN在BSM和CEV上的精度优于参数化PINN，在Heston上参数化PINN略优，但统一PINN的网络参数量仅为参数化PINN的约四分之一，具有更高的参数效率。真实市场回测表明：校准Heston在中长期期权上显著优于BSM；PINN-BSM在训练参数范围内具有优异的泛化能力；进一步的架构改进是重要的未来工作方向。
