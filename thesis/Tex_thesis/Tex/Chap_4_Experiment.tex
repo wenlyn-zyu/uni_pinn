@@ -102,7 +102,7 @@
   \label{fig:training_loss}
 \end{figure}
 
-表~\ref{tab:accuracy}报告了三模型PINN在三大模型上的精度，表~\ref{tab:compare}给出了与独立PINN和参数化PINN的对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。图~\ref{fig:price_curves}和图~\ref{fig:compare}分别展示了价格曲线与对比结果。
+表~\ref{tab:accuracy}报告了三模型PINN在三大模型上的精度，表~\ref{tab:compare}给出了与独立PINN和参数化PINN的对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。三模型PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为三模型PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。图~\ref{fig:compare}展示了各方法的价格曲线对比结果。
 
 \begin{table}[htbp]
   \centering
@@ -141,13 +141,6 @@
     \hline
   \end{tabular}
 \end{table}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{Img/price_curves.pdf}
-  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为三模型PINN预测；竖虚线标记平值点（$S=K$）。}
-  \label{fig:price_curves}
-\end{figure}
 
 \begin{figure}[htbp]
   \centering
