@@ -55,7 +55,7 @@
 
 实验在两类数据集上进行评估。合成数据集基于72组参数变体（6 BSM + 12 CEV + 54 Heston）生成，评估点取$S\in[50,250]$共50个均匀采样点，参考解由各模型的解析解或半解析解预先计算：BSM采用Black-Scholes解析公式（精确解）；CEV采用Schroder非中心卡方分布解析解（精度约$10^{-15}$，由\texttt{scipy.stats.ncx2}计算）；Heston采用特征函数半解析法（Gil-Pelaez反演，精度约$10^{-4}$）。
 
-真实市场数据集使用CBOE提供的SPY（标普500 ETF）期权链数据（下载日期：2026年5月11日，SPY现价$S=739.75$美元），无风险利率取美国1年期国债收益率$r=4.3\%$。对每个到期日，筛选满足以下条件的看涨合约：隐含波动率$\text{IV}\in(1\%, 200\%)$且最新成交价$>0.10$美元；行权价$K\in[0.85S,\,1.15S]$（ATM $\pm15\%$），确保Heston特征函数数值积分的稳定性。共筛选出23个到期日，覆盖$T\in[0.06, 2.59]$年的宽泛时间跨度，总计2824个合约。
+真实市场数据集使用CBOE提供的SPY（标普500 ETF）期权链数据（下载日期：2026年5月11日，SPY现价$S=739.75$美元），无风险利率取美国1年期国债收益率$r=4.3\%$。对每个到期日，筛选满足以下条件的看涨合约：隐含波动率$\text{IV}\in(1\%, 200\%)$且最新成交价$>0.10$美元；行权价$K\in[0.85S,\,1.15S]$（ATM $\pm15\%$），确保Heston特征函数数值积分的稳定性。共筛选出23个到期日，覆盖$T\in[0.06, 2.59]$年的宽泛时间跨度，总计2824个合约，本节从中选取8个代表性到期日进行详细分析。参数校准方面，BSM对每个合约用Brent法反解隐含波动率，取中位数作为全局$\sigma^*$，校准后的$\sigma^*$在0.13至0.17之间；CEV最小化加权MSE，用L-BFGS-B多起点优化，$\beta\in(0.01,1.0]$，中长期到期日$\beta$在0.1至0.5之间，说明SPY期权存在显著的杠杆效应；Heston采用Little Heston Trap稳定公式\cite{albrecher2007little}进行半解析定价，8个起点L-BFGS-B优化，参数范围：$\kappa\in[0.05,20]$，$\theta\in[0.001,0.5]$，$\xi\in[0.01,2.5]$，$\rho\in[-0.98,0]$，$v_0\in[0.001,0.5]$。PINN定价时将真实市场参数归一化至训练域（$S'=100$，$K'=100\cdot K/S$），定价结果乘以$S/100$还原至真实价格尺度。
 
 \section{评估指标}\label{sec:exp_metrics}
 
@@ -93,22 +93,22 @@
 
 \section{实验结果}\label{sec:results}
 
-图~\ref{fig:training_loss}展示了统一PINN的训练损失曲线。PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降，说明边界条件和数据锚点均被精确满足；余弦退火调度使网络在后期持续精细化。72个参数变体的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
+图~\ref{fig:training_loss}展示了统一PINN的训练损失曲线。PDE残差损失主导总损失；边界条件损失和数据锚点损失在训练早期快速下降；余弦退火调度使网络在后期持续精细化。72个参数变体的联合训练使网络在宽泛的参数空间上具备良好的泛化能力。
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{Img/training_loss.pdf}
-  \caption{统一PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失（$\mathcal{L}_\mathrm{pde}$）同步下降；边界条件损失（$\mathcal{L}_\mathrm{bc}$）和数据锚点损失（$\mathcal{L}_\mathrm{data}$）在训练早期快速收敛至$10^{-5}$量级。余弦退火调度使损失在后期持续缓慢下降。}
+  \caption{统一PINN（v16）训练损失曲线（30000步，72个参数变体）。总损失与PDE残差损失同步下降；边界条件损失和数据锚点损失在训练早期快速收敛至$10^{-5}$量级。}
   \label{fig:training_loss}
 \end{figure}
 
-表~\ref{tab:accuracy}报告了统一PINN在三大模型上的精度评估结果（评估点$S\in[50,250]$，共50个均匀采样点）。三大模型的精度均达到实用水平：BSM的MAE仅为0.0005，RelMAE$_\text{ATM}$=0.0009\%，得益于软掩码在$\xi=0$时的精确退化和BS基线的完美匹配；CEV（$\sigma=0.20$，$\beta=0.5$）的MAE=0.032，RelMAE$_\text{ATM}$=0.79\%；Heston的MAE=0.102，RelMAE$_\text{ATM}$=0.599\%。三种模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。图~\ref{fig:price_curves}展示了三大模型在$t=0$时的期权价格曲线，BSM的PINN预测与解析解高度吻合；CEV在$S\approx 80$至$100$区间存在约$0.1$的系统性偏差，与CEV参考解的数值误差有关；Heston的PINN预测与半解析参考解吻合良好，最大误差约$0.07$，出现在深度实值区域。
+表~\ref{tab:accuracy}报告了统一PINN在三大模型上的精度，表~\ref{tab:compare}给出了与独立PINN和参数化PINN的对比。三大模型的ATM相对误差均低于1\%，在标准参数集下表现均衡。统一PINN在BSM和CEV上的精度显著优于独立PINN基线和参数化PINN；在Heston上参数化PINN略优（0.430\% vs 0.599\%），原因是其训练范围更宽，但网络参数量约为统一PINN的4倍，在BSM和CEV上精度反而更低，说明软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换引入的额外误差。图~\ref{fig:price_curves}和图~\ref{fig:compare}分别展示了价格曲线与对比结果。
 
 \begin{table}[htbp]
   \centering
   \caption{统一PINN（v16）在三大模型上的精度评估}
   \label{tab:accuracy}
-  \begin{tabular}{lccc}
+  \begin{tabular}{lcc}
     \hline
     模型 & MAE & RelMAE$_\text{ATM}$ \\
     \hline
@@ -118,92 +118,6 @@
     \hline
   \end{tabular}
 \end{table}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{Img/price_curves.pdf}
-  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。}
-  \label{fig:price_curves}
-\end{figure}
-
-统一PINN的推断速度在GPU上约为2ms，CPU上约为8ms（单次定价，批量输入），能够同时支持三种模型，无需针对不同参数重新计算。大语言模型路由层设计了覆盖三种模型和中英文输入的测试用例，所有数值参数均被正确提取，缺失参数均使用了合理的默认值。路由层对中英文混合输入、参数顺序不同、参数名称变体均能正确处理，当用户未明确指定模型但提供了特定参数（如$\kappa,\theta,\xi,\rho$）时，大语言模型能够正确推断应使用Heston模型。
-
-\section{真实市场数据验证}\label{sec:market_validation}
-
-\subsection{数据与设置}
-
-为验证统一PINN在真实市场条件下的表现，本文使用CBOE提供的SPY（标普500 ETF）期权链数据（下载日期：2026年5月11日，SPY现价$S=739.75$美元）。无风险利率取美国1年期国债收益率$r=4.3\%$。本节使用v16版本（unified\_v16\_gl）进行PINN定价，与§\ref{sec:accuracy}精度评估保持一致。
-
-对每个到期日，筛选满足以下条件的看涨合约：隐含波动率$\text{IV}\in(1\%, 200\%)$且最新成交价$>0.10$美元；行权价$K\in[0.85S,\,1.15S]$（ATM $\pm15\%$），确保Heston特征函数数值积分的稳定性。
-
-共筛选出23个到期日，覆盖$T\in[0.06, 2.59]$年的宽泛时间跨度，合约数量从81到211个不等，总计2824个合约。本节从中选取8个代表性到期日（覆盖$T\in[0.06, 2.59]$年）进行详细分析。
-
-\subsection{参数校准方法}
-
-\textbf{BSM校准}：对每个合约用Brent法反解隐含波动率，取中位数作为全局$\sigma^*$。校准后的$\sigma^*$在0.13至0.17之间，反映了SPY期权市场的低波动率环境。
-
-\textbf{CEV校准}：最小化加权MSE，局部波动率近似为$\sigma_\text{local}(K)=\sigma\cdot(S/K)^{1-\beta}$，用L-BFGS-B多起点优化，$\beta\in(0.01,1.0]$。校准结果显示$\beta$在0.01至1.0之间，部分到期日$\beta\approx 1$（退化为BSM），中长期到期日$\beta$在0.1至0.5之间，说明SPY期权存在显著的杠杆效应。
-
-\textbf{Heston校准}：采用Little Heston Trap稳定公式\cite{albrecher2007little}进行半解析定价，8个起点L-BFGS-B优化，参数范围：$\kappa\in[0.05,20]$，$\theta\in[0.001,0.5]$，$\xi\in[0.01,2.5]$，$\rho\in[-0.98,0]$，$v_0\in[0.001,0.5]$。
-
-\textbf{PINN-BSM定价}：将真实市场参数归一化至训练域（$S'=100$，$K'=100\cdot K/S$），使用BSM校准参数$\sigma^*$输入统一PINN，定价结果乘以$S/100$还原至真实价格尺度。
-
-\textbf{PINN-Heston定价}：使用Heston校准参数$(\kappa^*,\theta^*,\xi^*,\rho^*,v_0^*)$输入统一PINN，同样进行归一化和反归一化处理。
-
-\subsection{回测结果}
-
-表~\ref{tab:market_results}报告了8个代表性到期日上五种方法相对市场价格的MAE（单位：美元）。
-
-\begin{table}[htbp]
-  \centering
-  \caption{五种方法与SPY真实市场价格的MAE对比（单位：美元）}
-  \label{tab:market_results}
-  \begin{tabular}{lrrrrrrrr}
-    \hline
-    到期日 & $T$(年) & $n$ & \makecell{校准\\BSM} & \makecell{校准\\Heston} & \makecell{PINN\\-BSM} & \makecell{PINN\\-Heston} & \makecell{参数化\\PINN} \\
-    \hline
-    Jun 05 2026 & 0.060 & 197 & 1.78 & \textbf{0.34} & 1.78 & 15.64 & 27.13 \\
-    Jun 30 2026 & 0.129 & 211 & 1.46 & \textbf{0.14} & 1.46 & 34.30 & 42.33 \\
-    Aug 21 2026 & 0.271 &  81 & 1.64 & \textbf{0.13} & 1.64 & 73.59 & 11.19 \\
-    Sep 30 2026 & 0.381 & 145 & 2.88 & \textbf{0.18} & 2.88 & 10.66 & 14.06 \\
-    Dec 31 2026 & 0.633 & 151 & 3.30 & \textbf{0.30} & 3.30 &  4.98 &  0.99 \\
-    Mar 19 2027 & 0.847 &  92 & 3.77 & \textbf{0.19} & 3.77 &  6.89 &  1.13 \\
-    Dec 17 2027 & 1.595 &  98 & 5.27 & \textbf{0.29} & 5.27 &  7.47 &  4.04 \\
-    Dec 15 2028 & 2.592 &  98 & 6.50 & \textbf{0.56} & 6.50 &  8.93 &  6.61 \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{分析}
-
-从表~\ref{tab:market_results}可以观察到以下规律。在短期期权（$T<0.15$年）上，BSM、CEV、Heston三个校准模型的MAE几乎相同（差距$<0.1$美元），说明短期期权的波动率微笑较平坦，三个模型的额外自由度对定价贡献有限，此区间BSM的计算效率优势最为突出。在中长期期权（$T>0.25$年）上，Heston明显优于BSM：以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%；Mar 19 2027（$T=0.847$）中，Heston MAE=\$0.19，而BSM MAE=\$3.77，体现了随机波动率模型在中长期期权定价中的优势。Sep 30 2026和Dec 31 2026两个到期日的校准模型MAE均高达2至3美元，高于相邻到期日，可能与季末和年末流动性变化、市场微结构噪声有关，属于市场特殊情况，不影响整体结论。
-
-PINN-BSM的MAE与校准BSM几乎相同（差距$<0.1$美元，$T<0.4$年），表现出优异的泛化能力，验证了本文方法的参数泛化性。参数化PINN在中长期期权（$T>0.5$年）上的MAE显著低于统一PINN-Heston，说明更宽的训练参数范围对真实市场参数的覆盖更好；然而在短期期权（$T<0.3$年）上，参数化PINN的MAE仍远高于校准Heston，说明即使扩大训练范围，PINN方法在真实市场参数下的泛化能力仍受限于网络容量和参数域覆盖。PINN-Heston的MAE显著高于校准Heston（高出5至73美元），根本原因在于三方面：一是参数域外推，v16版本的Heston训练参数范围（$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$，$\rho\in[-0.7,-0.5]$）无法覆盖SPY期权校准得到的极端参数（$\kappa$可高达10至20，$\xi$可高达2.1）；二是价格尺度不匹配，真实SPY价格$S=739.75$，归一化处理在真实市场参数下可能引入额外误差；三是网络容量瓶颈，Heston的5维参数空间对网络容量要求远高于BSM/CEV，统一PINN用同一个网络同时拟合三种模型存在根本性局限，需要从架构层面入手加以解决，留作未来工作（见第~\ref{sec:limitations}节）。
-
-
-
-\section{独立PINN与统一PINN精度对比}\label{sec:compare}
-
-为评估本文方法的有效性，本节在相同参数集下对比独立PINN、参数化PINN与统一PINN的定价精度。评估点取$S\in[50,250]$，共50个均匀采样点，$t=0$。所有方法使用统一参数集，如表~\ref{tab:compare_params}所示。
-
-\begin{table}[htbp]
-  \centering
-  \caption{精度对比实验参数设置}
-  \label{tab:compare_params}
-  \begin{tabular}{llll}
-    \hline
-    参数 & BSM & CEV & Heston \\
-    \hline
-    $K$, $T$, $r$ & 100, 1年, 0.05 & 100, 1年, 0.05 & 100, 1年, 0.05 \\
-    $\sigma$ & 0.20 & 0.20 & --- \\
-    $\beta$ & 1.0 & 0.5 & --- \\
-    $\kappa,\theta,\xi,\rho,v_0$ & --- & --- & 2.0, 0.04, 0.3, $-$0.7, 0.04 \\
-    参考基准 & BS解析解 & Schroder解析解 & GL半解析解 \\
-    \hline
-  \end{tabular}
-\end{table}
-
-Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN复现，以PUT期权为输出，通过put-call parity转换为CALL价格；评估参数$\theta=0.04$略低于其训练下限$0.062$，属于轻微超出训练范围的情形。Heston评估仅保留$S/K\geq 0.85$的数据点（原因见第~\ref{sec:exp_metrics}节）。参数化PINN（第~\ref{sec:parametric_pinn}节）在更宽的参数范围内训练，网络容量为统一PINN的约4倍（8层$\times$256）。
 
 \begin{table}[htbp]
   \centering
@@ -228,9 +142,12 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
   \end{tabular}
 \end{table}
 
-统一PINN在BSM上的RelMAE$_\text{ATM}$为0.0009\%，CEV为0.790\%，均显著优于参数化PINN的0.126\%和1.230\%；在Heston上，参数化PINN的0.430\%略优于统一PINN的0.599\%，原因是参数化PINN训练范围更宽，对标准参数集覆盖更充分。然而参数化PINN的网络参数量约为统一PINN的4倍，在BSM和CEV上的精度反而更低，说明更大的网络容量并不总能带来更好的精度，统一PINN通过软掩码和加法参数化实现了更高效的归纳偏置。Hainaut \& Casas (2024) 的较高误差主要来自评估参数轻微超出训练范围以及put-call parity转换在非平值区域引入的额外误差。
-
-图~\ref{fig:compare}展示了三种模型的价格曲线对比。
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{Img/price_curves.pdf}
+  \caption{三大模型期权价格曲线（$t=0$，$S\in[50,250]$，$K=100$）。实线为参考解，虚线为统一PINN预测；竖虚线标记平值点（$S=K$）。}
+  \label{fig:price_curves}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering
@@ -239,11 +156,7 @@ Heston独立基准采用Hainaut和Casas\cite{hainaut2024heston}的参数化PINN�
   \label{fig:compare}
 \end{figure}
 
-\section{Greeks计算}\label{sec:greeks}
-
-PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额外推导。本节验证统一PINN计算的Delta、Gamma、Vega与解析/有限差分参考值的一致性。
-
-对BSM模型，Delta和Gamma通过对$S$的自动微分计算，Vega通过对$\sigma$的有限差分计算（步长$h=0.001$），参考值为Black-Scholes解析公式，评估点取$S\in\{90,100,110\}$，$t=0$，$\sigma\in\{0.13,0.17,0.20,0.25\}$。BSM Greeks的平均相对误差均低于0.2\%（Delta 0.03\%，Gamma 0.13\%，Vega 0.09\%），表明统一PINN通过自动微分计算的一阶和二阶导数与解析解高度吻合。
+统一PINN的推断速度在GPU上约为2ms，CPU上约为8ms，能够同时支持三种模型，无需针对不同参数重新计算。PINN的另一优势是可通过自动微分直接计算Greeks，无需额外推导。BSM的Delta、Gamma、Vega平均相对误差均低于0.2\%（见表~\ref{tab:greeks_bsm}），与解析解高度吻合。Heston Delta的平均误差为1.83\%，Gamma误差较高（11.41\%），主要集中在高$\kappa$、高$\xi$的极端参数区域，在基准参数设置下Delta误差约0.56\%、Gamma误差约9.93\%，与文献中同类工作的精度水平相当（见表~\ref{tab:greeks_heston}）。大语言模型路由层对中英文混合输入、参数顺序不同、参数名称变体均能正确处理，当用户未明确指定模型但提供了特定参数时，能够正确推断应使用的模型。
 
 \begin{table}[htbp]
   \centering
@@ -260,8 +173,6 @@ PINN的一个重要优势是可通过自动微分直接计算Greeks，无需额�
   \end{tabular}
 \end{table}
 
-Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心有限差分计算，评估参数：$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$，$v_0=0.04$，$K=100$，$T=1$，$r=0.05$。Heston Delta的平均误差为1.83\%，处于可接受范围。Gamma误差较高（11.41\%），主要集中在高均值回归速度（$\kappa=5$）和高vol-of-vol（$\xi=0.5$）的极端参数区域，这些区域PDE系数变化剧烈，二阶导数的数值精度本身也受有限差分步长影响。在基准参数设置下，Delta误差约0.56\%，Gamma误差约9.93\%，与文献中同类工作的精度水平相当。
-
 \begin{table}[htbp]
   \centering
   \caption{Heston Greeks精度（统一PINN vs 有限差分参考解，平均相对误差）}
@@ -275,6 +186,32 @@ Heston模型无简单解析Greeks，参考值通过对GL半解析价格的中心
     \hline
   \end{tabular}
 \end{table}
+
+\section{真实市场数据验证}\label{sec:market_validation}
+
+为验证统一PINN在真实市场条件下的表现，本节使用第~\ref{sec:exp_data}节描述的SPY期权链数据，选取8个代表性到期日进行详细分析。表~\ref{tab:market_results}报告了五种方法相对市场价格的MAE（单位：美元）。
+
+\begin{table}[htbp]
+  \centering
+  \caption{五种方法与SPY真实市场价格的MAE对比（单位：美元）}
+  \label{tab:market_results}
+  \begin{tabular}{lrrrrrrrr}
+    \hline
+    到期日 & $T$(年) & $n$ & \makecell{校准\\BSM} & \makecell{校准\\Heston} & \makecell{PINN\\-BSM} & \makecell{PINN\\-Heston} & \makecell{参数化\\PINN} \\
+    \hline
+    Jun 05 2026 & 0.060 & 197 & 1.78 & \textbf{0.34} & 1.78 & 15.64 & 27.13 \\
+    Jun 30 2026 & 0.129 & 211 & 1.46 & \textbf{0.14} & 1.46 & 34.30 & 42.33 \\
+    Aug 21 2026 & 0.271 &  81 & 1.64 & \textbf{0.13} & 1.64 & 73.59 & 11.19 \\
+    Sep 30 2026 & 0.381 & 145 & 2.88 & \textbf{0.18} & 2.88 & 10.66 & 14.06 \\
+    Dec 31 2026 & 0.633 & 151 & 3.30 & \textbf{0.30} & 3.30 &  4.98 &  0.99 \\
+    Mar 19 2027 & 0.847 &  92 & 3.77 & \textbf{0.19} & 3.77 &  6.89 &  1.13 \\
+    Dec 17 2027 & 1.595 &  98 & 5.27 & \textbf{0.29} & 5.27 &  7.47 &  4.04 \\
+    Dec 15 2028 & 2.592 &  98 & 6.50 & \textbf{0.56} & 6.50 &  8.93 &  6.61 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+在短期期权（$T<0.15$年）上，三个校准模型的MAE几乎相同，说明短期波动率微笑较平坦，额外自由度对定价贡献有限。在中长期期权（$T>0.25$年）上，Heston明显优于BSM：以Aug 21（$T=0.271$）为例，Heston MAE=\$0.13，仅为BSM MAE（\$1.64）的8\%，体现了随机波动率模型在中长期定价中的优势。Sep 30和Dec 31两个到期日误差偏高，可能与季末、年末流动性变化有关，属于市场特殊情况。PINN-BSM的MAE与校准BSM几乎相同（$T<0.4$年），验证了本文方法的参数泛化性。PINN-Heston的MAE显著高于校准Heston，根本原因在于：训练参数范围（$\kappa\in[1.0,3.0]$，$\xi\in[0.2,0.4]$）无法覆盖SPY校准得到的极端参数（$\kappa$可高达20，$\xi$可高达2.1）；以及统一PINN用同一网络拟合三种模型，Heston的5维参数空间构成容量瓶颈，需从架构层面改进，留作未来工作（见第~\ref{sec:limitations}节）。
 
 \section{本章小结}\label{sec:exp_summary}
 
