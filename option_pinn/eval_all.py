@@ -67,6 +67,26 @@ def _mae(pred, ref):
     return float(np.mean(np.abs(np.array(pred) - np.array(ref))))
 
 
+def _moneyness_bucketed_relmae(pred, ref, S_arr, K=K_SYN):
+    """RelMAE broken down by moneyness bucket."""
+    pred, ref = np.array(pred, dtype=float), np.array(ref, dtype=float)
+    s_arr = np.array(S_arr, dtype=float)
+    buckets = [
+        ("deep_otm",  0.50, 0.80),
+        ("otm",       0.80, 0.95),
+        ("atm",       0.95, 1.05),
+        ("itm",       1.05, 1.20),
+    ]
+    result = {}
+    for name, lo, hi in buckets:
+        mask = (s_arr / K >= lo) & (s_arr / K < hi) & (np.abs(ref) > 0.01)
+        if mask.sum() == 0:
+            result[name] = float("nan")
+        else:
+            result[name] = float(np.mean(np.abs((pred[mask] - ref[mask]) / np.abs(ref[mask]))))
+    return result
+
+
 def _mae_relmae_otm(pred, ref, S_arr, K=K_SYN, threshold=0.85):
     """MAE and RelMAE restricted to S/K >= threshold (exclude deep OTM calls).
 
@@ -342,6 +362,18 @@ def eval_synthetic():
     pred_heston_u = [unified.price(p_heston, S) for S in S_GRID]
     add_price("unified_v2", pred_bsm_u, pred_cev_u, ref_cev,
               pred_heston_u, ref_heston_u)
+
+    # Moneyness-bucketed RelMAE for unified model
+    print("\n=== Moneyness-Bucketed RelMAE (Unified v2) ===")
+    for model_name, pred, ref in [
+        ("BSM",    pred_bsm_u,    ref_bsm),
+        ("CEV",    pred_cev_u,    ref_cev),
+        ("Heston", pred_heston_u, ref_heston_u),
+    ]:
+        buckets = _moneyness_bucketed_relmae(pred, ref, S_GRID)
+        print(f"  {model_name}: deep_otm={buckets['deep_otm']:.4%}  "
+              f"otm={buckets['otm']:.4%}  atm={buckets['atm']:.4%}  "
+              f"itm={buckets['itm']:.4%}")
 
     greeks_bsm_u    = unified_bsm_greeks(unified, p_bsm,    S_GRID)
     greeks_heston_u = unified_greeks_autograd(unified, p_heston, S_GRID)

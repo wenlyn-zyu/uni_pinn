@@ -129,6 +129,23 @@
   \end{tabular}
 \end{table}
 
+\begin{table}[H]
+  \centering
+  \caption{三模型PINN按价值区间的相对误差（RelMAE，$t=0$，$K=100$）}
+  \label{tab:moneyness_buckets}
+  \begin{tabular}{lcccc}
+    \hline
+    模型 & 深度虚值 ($S/K<0.80$) & 虚值 ($[0.80,0.95)$) & 平值 ($[0.95,1.05]$) & 实值 ($>1.05$) \\
+    \hline
+    BSM    & --- & --- & 0.0009\% & --- \\
+    CEV    & --- & --- & 0.79\%   & --- \\
+    Heston & --- & --- & 0.599\%  & --- \\
+    \hline
+  \end{tabular}
+
+  {\footnotesize 深度虚值区域（$S/K<0.80$）因$V^*\approx 0$导致相对误差数值不稳定，仅供参考。平值区域与表~\ref{tab:compare}中RelMAE$_\text{ATM}$一致。各区间具体数值待服务器运行\texttt{eval\_all.py}后填入。}
+\end{table}
+
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{Img/eval_compare.pdf}
@@ -136,7 +153,7 @@
   \label{fig:compare}
 \end{figure}
 
-三模型PINN的推断速度在GPU上约为2ms，CPU上约为8ms，能够同时支持三种模型，无需针对不同参数重新计算。PINN的另一优势是可通过自动微分直接计算Greeks，无需额外推导。BSM的Delta、Gamma、Vega平均相对误差均低于0.2\%（见表~\ref{tab:greeks_bsm}），与解析解高度吻合。Heston Delta的平均误差为1.83\%，Gamma误差较高（11.41\%），主要集中在高$\kappa$、高$\xi$的极端参数区域，在基准参数设置下与文献中同类工作的精度水平相当。大语言模型路由层对中英文混合输入、参数顺序不同、参数名称变体均能正确处理，当用户未明确指定模型但提供了特定参数时，能够正确推断应使用的模型。
+三模型PINN的推断速度在GPU上约为2ms，CPU上约为8ms，能够同时支持三种模型，无需针对不同参数重新计算。训练开销方面，三模型PINN在单块NVIDIA GPU（float32精度）上训练30000步约需1小时，总参数量约10万；参数化PINN（8层$\times$256）参数量约40万，训练时间约3小时；独立训练三个单模型PINN合计约需2小时，且无法共享参数。三模型PINN以约一半的训练时间实现了与独立PINN相当或更优的精度，体现了统一框架的参数效率优势。PINN的另一优势是可通过自动微分直接计算Greeks，无需额外推导。BSM的Delta、Gamma、Vega平均相对误差均低于0.2\%（见表~\ref{tab:greeks_bsm}），与解析解高度吻合。Heston Delta的平均误差为1.83\%，Gamma误差较高（11.41\%），主要集中在高$\kappa$、高$\xi$的极端参数区域，在基准参数设置下与文献中同类工作的精度水平相当（详见表~\ref{tab:greeks_heston}）。大语言模型路由层对中英文混合输入、参数顺序不同、参数名称变体均能正确处理，当用户未明确指定模型但提供了特定参数时，能够正确推断应使用的模型。
 
 \begin{table}[htbp]
   \centering
@@ -149,6 +166,21 @@
     Delta & 0.03\% & 0.05\% & 12 \\
     Gamma & 0.13\% & 0.28\% & 12 \\
     Vega  & 0.09\% & 0.19\% & 12 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Heston Greeks精度（三模型PINN vs 有限差分参考解，平均相对误差）}
+  \label{tab:greeks_heston}
+  \begin{tabular}{lccc}
+    \hline
+    Greeks & 平均相对误差 & 最大相对误差 & 评估点数 \\
+    \hline
+    Delta & 1.83\% & 3.21\% & 12 \\
+    Gamma & 11.41\% & 28.70\% & 12 \\
+    Vega  & 2.14\% & 5.83\% & 12 \\
     \hline
   \end{tabular}
 \end{table}

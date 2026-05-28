@@ -46,7 +46,14 @@ CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$�
   \end{tabular}
 \end{table}
 
-注意到，当$\xi=0$时，$b=c=d=0$，统一算子自动退化为一维BSM/CEV方程；当$\xi>0$时，交叉项和$v$方向扩散项被激活，对应Heston的二维随机波动率结构。为实现三大模型之间的连续插值，本文引入软掩码：
+利用软掩码$m=\tanh^2(\xi/0.05)$，统一PDE算子的各系数具体实现为：
+\begin{align}
+  a &= (1-m)\cdot\sigma^2 S^{2\beta} + m\cdot vS^2, \label{eq:coeff_a}\\
+  b &= m\cdot\rho\xi vS, \label{eq:coeff_b}\\
+  c &= m\cdot\xi^2 v, \label{eq:coeff_c}\\
+  d &= m\cdot\kappa(\theta-v). \label{eq:coeff_d}
+\end{align}
+当$\xi=0$时，$m=0$，$b=c=d=0$，算子精确退化为一维BSM/CEV方程；当$\xi\geq 0.3$时，$m\approx 0.998$，算子精确对应Heston二维PDE。推断时对所有输入强制$\xi\in\{0\}\cup[0.2,\infty)$，避免中间值产生无金融意义的混合算子。为实现三大模型之间的连续插值，本文引入软掩码：
 \begin{equation}\label{eq:soft_mask}
   \text{mask} = \tanh\!\left(\frac{\xi}{0.05}\right)^2.
 \end{equation}
@@ -77,9 +84,32 @@ CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$�
 \begin{equation}\label{eq:sigma_eff}
   \sigma_\text{eff} = (1-\text{mask})\cdot\sigma + \text{mask}\cdot\sqrt{v}.
 \end{equation}
-网络最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，使训练开始时$K\cdot\text{net}\approx 0$，网络从接近正确答案的位置开始优化。深度虚值时$V_\text{BS}\to 0$，但$K\cdot\text{net}$仍可输出非零修正，网络可以学习到CEV/Heston相对于BSM的价格差异。
+$\sigma_\text{eff}$的设计原则是：当$\xi=0$时退化为BSM波动率$\sigma$，当$\xi>0$时以当前方差$\sqrt{v}$替代，使Black-Scholes基线在三种模型下均能提供合理的价格量级初始化；对于BSM/CEV输入，$v=v_0=\sigma^2$，故$\sigma_\text{eff}=\sigma$。网络最后一层权重初始化为$\mathcal{N}(0, 0.001^2)$，使训练开始时$K\cdot\text{net}\approx 0$，网络从接近正确答案的位置开始优化。深度虚值时$V_\text{BS}\to 0$，但$K\cdot\text{net}$仍可输出非零修正，网络可以学习到CEV/Heston相对于BSM的价格差异。
 
-网络输入为9维向量$x = \left[\frac{S}{S_\text{max}},\; \frac{v}{v_\text{max}},\; \frac{t}{T},\; \sigma,\; \beta,\; \kappa,\; \theta,\; \xi,\; \rho\right]$，其中$S_\text{max}=300$，$v_\text{max}=1$，归一化使各输入均落在$[0,1]$区间，避免不同量级的输入导致梯度不平衡。网络采用6层全连接结构，每层128个神经元，激活函数为$\tanh$：
+网络输入为9维向量$\mathbf{x}\in\mathbb{R}^9$，各维度的含义与归一化方式如表~\ref{tab:input_encoding}所示。
+
+\begin{table}[htbp]
+  \centering
+  \caption{统一PINN网络输入编码}
+  \label{tab:input_encoding}
+  \begin{tabular}{clccc}
+    \hline
+    维度 & 变量 & 归一化 & BSM/CEV取值 & Heston取值 \\
+    \hline
+    1 & $S/S_\text{max}$ & $[0,1]$ & $S/300$ & $S/300$ \\
+    2 & $v/v_\text{max}$ & $[0,1]$ & $v_0/1$ & $v/1$ \\
+    3 & $t/T$            & $[0,1]$ & $t/T$   & $t/T$ \\
+    4 & $\sigma$         & 原始值  & $\sigma$ & $0$ \\
+    5 & $\beta$          & 原始值  & $1.0$（BSM）/$0.5$（CEV） & $0$ \\
+    6 & $\kappa$         & 原始值  & $0$     & $\kappa$ \\
+    7 & $\theta$         & 原始值  & $0$     & $\theta$ \\
+    8 & $\xi$            & 原始值  & $0$     & $\xi$ \\
+    9 & $\rho$           & 原始值  & $0$     & $\rho$ \\
+    \hline
+  \end{tabular}
+\end{table}
+
+对于BSM/CEV模型，$v$维度取$v_0=\sigma^2$（初始方差），Heston专属参数（$\kappa,\theta,\xi,\rho$）填0；网络通过$\xi=0$自动识别模型类型，与软掩码机制一致。网络采用6层全连接结构，每层128个神经元，激活函数为$\tanh$：
 \begin{align}
   h_0 &= x \in \mathbb{R}^9, \\
   h_l &= \tanh(W_l h_{l-1} + b_l), \quad l=1,\ldots,6, \\
@@ -132,7 +162,7 @@ PDE残差损失在求解域内随机采样$N_c$个配点，计算统一PDE算子
 \begin{equation}
   P = C - S + Ke^{-r(T-t)}.
 \end{equation}
-完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；三模型PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
+鲁棒性方面，对于单位歧义（如"到期时间30天"与"到期时间0.082年"），系统提示词明确要求LLM将所有时间参数统一转换为年为单位输出。对于缺失字段，LLM使用预设默认值填充，不产生空值。本文的LLM路由层定位为教育和研究工具的前端接口，生产环境部署需额外增加规则校验层和审计日志。完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；三模型PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
 
 \section{参数化PINN对比方法}\label{sec:parametric_pinn}
 
