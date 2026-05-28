@@ -1,4 +1,4 @@
-\chapter{基于大模型和PINN的三模型期权求解方式}\label{chap:method}
+\chapter{三种期权模型求解方法}\label{chap:method}
 
 本章介绍三模型PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
 
@@ -136,8 +136,8 @@ PDE残差损失在求解域内随机采样$N_c$个配点，计算统一PDE算子
 
 \section{参数化PINN对比方法}\label{sec:parametric_pinn}
 
-为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_\text{BS}(\sigma_\text{eff})+K\cdot\text{net}(x)$和软掩码机制。与三模型PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为三模型PINN的4倍）。实验结果见第~\ref{sec:compare}节。
+为评估统一框架的有效性，本文同时实现了一个全参数化PINN（Fully Parametric PINN）作为对比基准。该方法将所有模型参数$(\sigma,\beta,\kappa,\theta,\xi,\rho)$与合约特征$(S,v,\tau,K,r)$共11维向量直接作为网络输入，采用8层$\times$256神经元的全连接网络，同样使用加法参数化输出$\hat{V}=V_{\mathrm{BS}}(\sigma_{\mathrm{eff}})+K\cdot\mathrm{net}(x)$和软掩码机制。与三模型PINN的主要区别在于：参数化PINN在更宽的参数范围内（BSM：$\sigma\in[0.05,0.50]$；CEV：$\sigma\in[0.10,0.30]$，$\beta\in[0.10,0.90]$；Heston：$\kappa\in[0.5,10]$，$\xi\in[0.05,0.50]$，$\rho\in[-0.95,-0.10]$）随机采样训练，理论上具有更强的参数泛化能力，但网络容量需求更高（参数量约为三模型PINN的4倍）。实验结果见第~\ref{sec:compare}节。
 
 \section{本章小结}\label{sec:method_summary}
 
-本章介绍了基于大模型和PINN的三模型期权求解方式。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现模型间的连续插值；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。
+本章介绍了三种期权模型求解方法。核心创新在于：（1）软掩码机制将三大模型的PDE算子统一为单一参数化形式，实现模型间的连续插值；（2）加法参数化输出以Black-Scholes解析解为基线，解决了深度虚值区域的数值退化问题；（3）LLM路由层通过结构化输出实现可靠的参数提取和模型选择，并支持欧式看涨和看跌期权。下一章将报告实验结果。
