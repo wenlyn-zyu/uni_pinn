@@ -46,7 +46,7 @@ CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$�
   \end{tabular}
 \end{table}
 
-当$\xi=0$时，$b=c=d=0$，统一算子自动退化为一维BSM/CEV方程；当$\xi>0$时，交叉项和$v$方向扩散项被激活，对应Heston的二维随机波动率结构。为实现三大模型之间的连续插值，本文引入软掩码：
+注意到，当$\xi=0$时，$b=c=d=0$，统一算子自动退化为一维BSM/CEV方程；当$\xi>0$时，交叉项和$v$方向扩散项被激活，对应Heston的二维随机波动率结构。为实现三大模型之间的连续插值，本文引入软掩码：
 \begin{equation}\label{eq:soft_mask}
   \text{mask} = \tanh\!\left(\frac{\xi}{0.05}\right)^2.
 \end{equation}
@@ -69,7 +69,7 @@ CEV模型（式~\eqref{eq:cev}）将扩散系数推广为$\sigma^2 S^{2\beta}$�
 
 \subsection{网络架构与加法参数化输出}
 
-直接用神经网络输出期权价格存在两个问题：初始化困难（随机初始化的网络输出量级约为$10^{-1}$，而期权价格量级约为$10^0$至$10^2$）；以及深度虚值退化（乘法参数化$V=V_\text{BS}\cdot(1+\text{net})$在$V_\text{BS}\to 0$时退化）。为此，本文采用加法参数化输出：
+直接用神经网络输出期权价格存在两个问题：其一，初始化困难，随机初始化的网络输出量级约为$10^{-1}$，而期权价格量级约为$10^0$至$10^2$；其二，深度虚值退化，乘法参数化$V=V_\text{BS}\cdot(1+\text{net})$在$V_\text{BS}\to 0$时退化。为此，本文采用加法参数化输出：
 \begin{equation}\label{eq:additive}
   \hat{V}(S,v,t;\boldsymbol{\lambda}) = V_\text{BS}(S,\tau;\sigma_\text{eff}) + K\cdot\text{net}(x),
 \end{equation}
