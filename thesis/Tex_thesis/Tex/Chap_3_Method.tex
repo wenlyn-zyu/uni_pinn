@@ -1,4 +1,4 @@
-\chapter{三种期权模型求解方法}\label{chap:method}
+\chapter{三种期权模型的统一求解框架}\label{chap:method}
 
 本章介绍三模型PINN期权定价方法的完整设计。核心思路是：通过软掩码机制将BSM、CEV、Heston三大模型的PDE算子统一为单一参数化形式，以加法参数化输出解决深度虚值区域的数值退化问题，并引入LLM路由层支持自然语言输入。图~\ref{fig:architecture}给出了系统的三层架构概览。
 
