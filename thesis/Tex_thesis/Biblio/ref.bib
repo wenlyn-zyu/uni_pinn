@@ -51,16 +51,6 @@
   year    = {1993}
 }
 
-% 14. Albrecher et al. (2007) — The Little Heston Trap
-@article{albrecher2007little,
-  author  = {Albrecher, Hansj{\"o}rg and Mayer, Philipp and
-             Schoutens, Wim and Tistaert, Jurgen},
-  title   = {The Little {Heston} Trap},
-  journal = {Wilmott Magazine},
-  pages   = {83--92},
-  year    = {2007}
-}
-
 %--- PINN 方法 ----------------------------------------------------------------
 
 % 5. Raissi et al. (2019)
@@ -76,19 +66,21 @@
 }
 
 % 6. Dhiman & Hu (2023)
-@article{dhiman2023pinn,
-  author  = {Dhiman, Ashish and Hu, Yibei},
-  title   = {Physics Informed Neural Network for Option Pricing},
-  journal = {arXiv preprint arXiv:2312.06711},
-  year    = {2023}
+@techreport{dhiman2023pinn,
+  author      = {Dhiman, Ashish and Hu, Yibei},
+  title       = {Physics Informed Neural Network for Option Pricing},
+  institution = {arXiv},
+  number      = {2312.06711},
+  year        = {2023}
 }
 
 % 7. Zamxaka (2024)
-@article{zamxaka2023cev,
+@mastersthesis{zamxaka2023cev,
   author  = {Zamxaka, Nichume},
   title   = {Option Pricing with Physics-Informed Neural Networks ({PINNs})},
-  journal = {University of Cape Town, Master's Thesis},
-  year    = {2024}
+  school  = {University of Cape Town},
+  year    = {2024},
+  address = {Cape Town, South Africa}
 }
 
 % 8. Hainaut & Casas (2024)
@@ -116,12 +108,13 @@
 
 %--- 优化算法 -----------------------------------------------------------------
 
-% 13. Kingma & Ba (2017) — Adam
-@article{kingma2014adam,
-  author  = {Kingma, Diederik P. and Ba, Jimmy},
-  title   = {Adam: A Method for Stochastic Optimization},
-  journal = {arXiv preprint arXiv:1412.6980},
-  year    = {2017}
+% 13. Kingma & Ba (2015) — Adam (ICLR 2015)
+@inproceedings{kingma2014adam,
+  author    = {Kingma, Diederik P. and Ba, Jimmy},
+  title     = {Adam: A Method for Stochastic Optimization},
+  booktitle = {Proceedings of the 3rd International Conference on Learning Representations (ICLR)},
+  year      = {2015},
+  address   = {San Diego, CA}
 }
 
 %--- 参考解 ------------------------------------------------------------------
@@ -140,21 +133,23 @@
 %--- LLM 辅助科学计算 --------------------------------------------------------
 
 % 10. Liu et al. (2025) — PDE-Agent
-@article{liu2025pdeagent,
-  author  = {Liu, Jianming and Zhu, Ren and Xu, Jian and Ding, Kun and
-             Zhang, Xu-Yao and Meng, Gaofeng and Liu, Cheng-Lin},
-  title   = {{PDE-Agent}: A Toolchain-Augmented Multi-Agent Framework
-             for {PDE} Solving},
-  journal = {arXiv preprint arXiv:2512.16214},
-  year    = {2025}
+@techreport{liu2025pdeagent,
+  author      = {Liu, Jianming and Zhu, Ren and Xu, Jian and Ding, Kun and
+                 Zhang, Xu-Yao and Meng, Gaofeng and Liu, Cheng-Lin},
+  title       = {{PDE-Agent}: A Toolchain-Augmented Multi-Agent Framework
+                 for {PDE} Solving},
+  institution = {arXiv},
+  number      = {2512.16214},
+  year        = {2025}
 }
 
-% 12. Xiao et al. (2025) — TradingAgents
-@article{xiao2024tradingagents,
-  author  = {Xiao, Yijia and Sun, Edward and Luo, Di and Wang, Wei},
-  title   = {{TradingAgents}: Multi-Agents {LLM} Financial Trading Framework},
-  journal = {arXiv preprint arXiv:2412.20138},
-  year    = {2025}
+% 12. Xiao et al. (2024) — TradingAgents
+@inproceedings{xiao2024tradingagents,
+  author    = {Xiao, Yijia and Sun, Edward and Luo, Di and Wang, Wei},
+  title     = {{TradingAgents}: Multi-Agents {LLM} Financial Trading Framework},
+  booktitle = {Workshop on Multi-Agent AI in the Real World},
+  year      = {2024},
+  note      = {arXiv:2412.20138}
 }
 
 %---------------------------------------------------------------------------%

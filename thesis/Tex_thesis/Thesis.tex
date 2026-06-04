@@ -101,7 +101,7 @@
 	%-
 	%-> Backmatter: bibliography, glossary, index
 	%-
-	\backmatter% initialize the environment
+	\cleardoublepage%
 	\intotoc{\bibname}% add link to contents table and bookmark
 	\bibliography{Biblio/ref}% bibliography
 	%-
@@ -111,15 +111,15 @@
 	\appendix% initialize the environment
 	\ctexset{
 		chapter = {
-			format = \linespread{1.0}\zihao{3}\bfseries\sffamily\centering,
 			name = {附录~},
 			number = \Alph{chapter},
-			aftername = \quad,
-			beforeskip = {7pt},
-			afterskip = {18pt},
 		}
 	}
 	\input{Tex/Appendix}% appendix content
+	%-
+	%-> Other backmatter
+	%-
+	\backmatter% initialize the environment for acknowledgements etc.
 	\input{Tex/Backmatter}% other information
 \end{document}
 %---------------------------------------------------------------------------%
