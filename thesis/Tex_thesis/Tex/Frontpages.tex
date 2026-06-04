@@ -3,7 +3,7 @@
 %---------------------------------------------------------------------------%
 \confidential{}
 \schoollogo{scale=0.2}{ShanghaiTechLogo}
-\title{基于物理信息神经网络和大语言模型的期权模型求解方法}
+\title{基于物理信息神经网络和大语言模型的期权定价模型求解方法}
 \author{朱雯琳}
 \ID{2022533035}
 \entranceYear{2022}
@@ -14,7 +14,7 @@
 \major{计算机科学与技术}
 \institute{上海科技大学信息科学与技术学院}
 \chinesedate{二零二六年~五月}
-\englishtitle{Option Model Solving Based on Physics-Informed Neural Networks and Large Language Models}
+\englishtitle{Option Pricing Model Solving Based on Physical Information Neural Networks and Large Language Models}
 \englishauthor{Wenlin Zhu}
 \englishadvisor{Supervisor:Yuanming Shi }
 \englishdegree{Bachelor}
@@ -31,23 +31,23 @@
 \setcounter{page}{1}
 \pagenumbering{Roman}
 
-期权定价是金融工程的核心问题之一。Black-Scholes-Merton模型、常弹性方差模型和Heston随机波动率模型是三大经典期权定价框架，其定价问题在数学上均归结为求解相应的偏微分方程：前两者对应二维抛物型方程，Heston引入随机波动率后升至三维。传统数值方法在求解高维偏微分方程时面临维数灾难，计算代价随维度指数增长。物理信息神经网络将偏微分方程残差嵌入损失函数，无需网格剖分，能够有效缓解这一计算瓶颈；然而，现有物理信息神经网络研究大多针对单一定价模型，缺乏将三大模型统一求解的方法，且传统工具要求用户手动指定模型类型和数值参数，对非专业用户门槛较高。
+期权定价是金融工程的核心问题之一。Black-Scholes-Merton模型、常弹性方差模型和Heston随机波动率模型是三大经典期权定价框架，其定价问题在数学上均归结为求解相应的偏微分方程：前两者对应一维抛物型方程，Heston引入随机波动率后升至二维。传统数值方法在求解高维偏微分方程时面临维数灾难，计算代价随维度指数增长。物理信息神经网络将偏微分方程残差嵌入损失函数，无需网格剖分，能够有效缓解这一计算瓶颈；然而，现有物理信息神经网络研究大多针对单一定价模型，缺乏将三大模型统一求解的方法，且传统工具要求用户手动指定模型类型和数值参数，对非专业用户门槛较高。
 
 本文研究基于物理信息神经网络与大语言模型的三模型期权定价方法。在物理信息神经网络部分，通过软掩码机制和加法参数化输出，将三大模型的偏微分方程算子统一为单一参数化形式，由一个深层全连接网络同时覆盖三种模型的解映射，无需分别训练独立网络。软掩码通过连续插值函数实现模型间的平滑过渡，当随机波动率参数趋近于零时自动退化为前两种模型，当其较大时激活Heston的随机波动率项；加法参数化以Black-Scholes解析解为基线，网络学习绝对修正量，解决了深度虚值区域的数值退化问题，终值条件通过Black-Scholes公式的极限行为自然满足。在大语言模型部分，引入DeepSeek作为智能路由层，通过结构化输出实现可靠的参数提取和模型选择，支持中英文自然语言输入，使非专业用户无需了解模型细节即可完成期权定价。
 
 实验在合成数据和真实市场数据两类场景下进行评估。结果表明，统一网络在三种模型的平值附近区域均达到较高精度，在Black-Scholes-Merton和常弹性方差模型上的精度优于独立训练的基线方法，具备实时定价能力。消融实验进一步验证了各核心组件的必要性，大语言模型路由层对各类自然语言输入均能准确完成模型选择与参数提取。
 
-\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；CEV模型；Heston模型；大语言模型；软掩码}
+\keywords{物理信息神经网络；期权定价；Black-Scholes-Merton模型；CEV模型；Heston模型；大语言模型}
 
 %---------------------------------------------------------------------------%
 %->> 英文摘要
 %---------------------------------------------------------------------------%
 \chapter*{Abstract}\chaptermark{Abstract}
 
-Option pricing is one of the core problems in financial engineering. The Black-Scholes-Merton (BSM) model, the Constant Elasticity of Variance (CEV) model, and the Heston stochastic volatility model constitute three classical option pricing frameworks. Mathematically, all three reduce to solving their respective partial differential equations: BSM and CEV yield two-dimensional parabolic PDEs, while Heston's introduction of stochastic volatility elevates the problem to three dimensions. Traditional numerical methods suffer from the curse of dimensionality when solving high-dimensional PDEs, with computational cost growing exponentially with dimension. Physics-Informed Neural Networks (PINNs) embed PDE residuals directly into the loss function and require no mesh discretization, effectively alleviating this computational bottleneck. However, existing PINN research predominantly targets single pricing models, and a unified framework capable of solving all three models simultaneously remains lacking. Moreover, conventional tools require users to manually specify model types and numerical parameters, posing a high barrier for non-expert users.
+Option pricing is one of the core problems in financial engineering. The Black-Scholes-Merton (BSM) model, the Constant Elasticity of Variance (CEV) model, and the Heston stochastic volatility model constitute three classical option pricing frameworks. Mathematically, all three reduce to solving their respective partial differential equations: BSM and CEV yield one-dimensional parabolic PDEs, while Heston's introduction of stochastic volatility elevates the problem to two dimensions. Traditional numerical methods suffer from the curse of dimensionality when solving high-dimensional PDEs, with computational cost growing exponentially with dimension. Physics-Informed Neural Networks (PINNs) embed PDE residuals directly into the loss function and require no mesh discretization, effectively alleviating this computational bottleneck. However, existing PINN research predominantly targets single pricing models, and a unified framework capable of solving all three models simultaneously remains lacking. Moreover, conventional tools require users to manually specify model types and numerical parameters, posing a high barrier for non-expert users.
 
 This paper investigates a three-model option pricing method based on PINNs and Large Language Models (LLMs). In the PINN component, a soft mask mechanism and additive parameterized output are employed to unify the PDE operators of BSM, CEV, and Heston into a single parameterized form. A single deep fully-connected network simultaneously covers the solution mappings of all three models without training separate networks. The soft mask realizes smooth transitions between models via a continuous interpolation function: when the vol-of-vol parameter approaches zero, the network automatically degrades to the first two models; when it is large, the stochastic volatility terms of Heston are activated. The additive parameterization uses the Black-Scholes analytical solution as a baseline, with the network learning absolute corrections, resolving the numerical degeneracy in deep out-of-the-money regions; the terminal condition is naturally satisfied through the limiting behavior of the Black-Scholes formula. In the LLM component, DeepSeek is introduced as an intelligent routing layer, achieving reliable parameter extraction and model selection via structured output, supporting natural language input in both Chinese and English, so that non-expert users can complete option pricing without knowledge of model internals.
 
 Experiments are conducted on two types of scenarios: synthetic data and real market data. Results demonstrate that the unified network achieves high accuracy near the at-the-money region across all three models, and outperforms independently trained baseline methods on BSM and CEV, with real-time pricing capability. Ablation studies further validate the necessity of each core component, and the LLM routing layer accurately completes model selection and parameter extraction for diverse natural language inputs.
 
-\englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; CEV Model; Heston Model; Large Language Models; Soft Mask}
+\englishkeywords{Physics-Informed Neural Networks; Option Pricing; Black-Scholes-Merton Model; CEV Model; Heston Model; Large Language Models}
