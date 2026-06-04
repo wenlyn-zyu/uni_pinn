@@ -123,7 +123,7 @@ $\tanh$激活函数光滑且高阶导数有界，适合PINN中计算二阶偏导
                       + w_\text{data}\,\mathcal{L}_\text{data}.
 \end{equation}
 
-配点是PINN训练的核心数据来源，完全由求解域的几何结构决定，无需任何真实市场观测数据。对每个参数变体在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内均匀随机采样$N_c=5000$个配点，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。对于BSM/CEV模型，$v$维度退化为常数，配点实际为二维；对于Heston模型，配点为完整三维。边界配点在各边界面上均匀采样$N_b=500$个点。数据锚点在$t=0$处取$N_d=20$个均匀分布的$S$值，对应价格由参考解析解预先计算，这是训练中唯一涉及"真实"（解析）价格的部分。
+配点是PINN训练的核心数据来源，完全由求解域的几何结构决定，无需任何真实市场观测数据。对每个参数变体在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内均匀随机采样$N_c=5000$个配点，每个训练步骤重新采样（online sampling），避免过拟合到固定配点集。对于BSM/CEV模型，$v$维度退化为常数，配点实际为二维；对于Heston模型，配点为完整三维。边界配点在各边界面上均匀采样$N_b=500$个点。数据锚点在$t=0$处取$N_d=20$个均匀分布的$S$值，对应价格由参考解析解预先计算，这是训练中唯一涉及``真实''（解析）价格的部分。
 
 PDE残差损失在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[0,T]$内随机采样$N_c$个配点，计算统一PDE算子的相对残差：
 \begin{equation}
@@ -149,7 +149,7 @@ PDE残差损失在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[
 
 三种定价模型分别适用于不同的市场假设，传统工具要求用户手动指定模型类型和全部数值参数。本文引入DeepSeek LLM作为智能路由层，使用户可以通过自然语言描述期权需求，由LLM自动完成模型选择和参数提取。
 
-系统提示词将LLM角色定义为"期权定价参数提取器"，规定模型选择规则：仅提供$\sigma$则选BSM，提及$\beta$或CEV则选CEV，提供$\kappa,\theta,\xi,\rho,v_0$或提及Heston、stochastic volatility则选Heston，默认BSM。对用户未提及的参数使用典型默认值（$S=100$，$K=100$，$T=1.0$，$r=0.05$，$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），并通过\texttt{response\_format: json\_object}强制输出合法JSON。LLM的输出遵循以下JSON Schema：
+系统提示词将LLM角色定义为``期权定价参数提取器''，规定模型选择规则：仅提供$\sigma$则选BSM，提及$\beta$或CEV则选CEV，提供$\kappa,\theta,\xi,\rho,v_0$或提及Heston、stochastic volatility则选Heston，默认BSM。对用户未提及的参数使用典型默认值（$S=100$，$K=100$，$T=1.0$，$r=0.05$，$\sigma=0.2$，$\beta=0.5$，$v_0=0.04$，$\kappa=2.0$，$\theta=0.04$，$\xi=0.3$，$\rho=-0.7$），并通过\texttt{response\_format: json\_object}强制输出合法JSON。LLM的输出遵循以下JSON Schema：
 \begin{verbatim}
 {
   "model": "bsm" | "cev" | "heston",
@@ -165,7 +165,7 @@ PDE残差损失在求解域$\Omega=[0,S_\text{max}]\times[0,v_\text{max}]\times[
 \begin{equation}
   P = C - S + Ke^{-r(T-t)}.
 \end{equation}
-鲁棒性方面，对于单位歧义（如``到期时间30天"与``到期时间0.082年"），系统提示词要求LLM将所有时间参数统一转换为年为单位输出。对于缺失字段，LLM使用预设默认值填充，不产生空值。本文的LLM路由层定位为教育和研究工具的前端接口，生产环境部署需额外增加规则校验层和审计日志。
+鲁棒性方面，对于单位歧义（如``到期时间30天''与``到期时间0.082年''），系统提示词要求LLM将所有时间参数统一转换为年为单位输出。对于缺失字段，LLM使用预设默认值填充，不产生空值。本文的LLM路由层定位为教育和研究工具的前端接口，生产环境部署需额外增加规则校验层和审计日志。
 
 完整定价流程为：用户输入自然语言描述（中英文均可）；LLM提取参数并选择模型；三模型PINN加载预训练权重，构造参数向量$\boldsymbol{\lambda}$；网络前向传播返回期权价格（约2ms）。
 

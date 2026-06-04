@@ -67,7 +67,7 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
 
 \begin{table}[htbp]
   \centering
-  \caption{三种独立PINN复现结果（$S\in[50,250]$，$t=0$）}
+  \caption{三种单模型PINN复现结果（$S\in[50,250]$，$t=0$）}
   \label{tab:reproduction}
   \begin{tabular}{lcccp{3cm}}
     \hline
@@ -90,7 +90,7 @@ Heston模型具有半解析解（特征函数方法与Gil-Pelaez反演），能�
   $^\ddagger$经put-call parity转换为CALL价格，仅统计$S/K\geq 0.85$区域。}
 \end{table}
 
-上述三个独立PINN验证了各模型PDE的可解性，并为后续三模型方法提供了对比基准。
+上述三个单模型PINN验证了各模型PDE的可解性，并为后续三模型方法提供了对比基准。
 
 近年来，针对期权定价PDE的PINN求解效率，研究者提出了多种改进方向。本文目标是单一网络统一求解三种模型，而非针对单一模型优化求解效率；自适应配点、极限学习机等技术可作为正交改进方向与本文框架结合，留作未来工作。
 

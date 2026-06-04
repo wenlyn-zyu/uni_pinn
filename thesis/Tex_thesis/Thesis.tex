@@ -109,6 +109,16 @@
 	%-
 	\cleardoublepage%
 	\appendix% initialize the environment
+	\ctexset{
+		chapter = {
+			format = \linespread{1.0}\zihao{3}\bfseries\sffamily\centering,
+			name = {附录~},
+			number = \Alph{chapter},
+			aftername = \quad,
+			beforeskip = {7pt},
+			afterskip = {18pt},
+		}
+	}
 	\input{Tex/Appendix}% appendix content
 	\input{Tex/Backmatter}% other information
 \end{document}
