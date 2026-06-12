@@ -13,9 +13,9 @@ os.makedirs(OUT, exist_ok=True)
 plt.rcParams.update({
     "font.family":        "serif",
     "font.serif":         ["DejaVu Serif", "Times New Roman", "serif"],
-    "font.size":          11,
-    "axes.titlesize":     13,
-    "axes.labelsize":     11,
+    "font.size":          26,
+    "axes.titlesize":     26,
+    "axes.labelsize":     26,
     "axes.linewidth":     1.0,
     "axes.spines.top":    False,
     "axes.spines.right":  False,
@@ -29,7 +29,7 @@ plt.rcParams.update({
     "ytick.minor.size":   2,
     "legend.framealpha":  0.95,
     "legend.edgecolor":   "#bbbbbb",
-    "legend.fontsize":    9.5,
+    "legend.fontsize":    26,
     "legend.handlelength": 2.8,
     "text.usetex":        False,
     "figure.dpi":         150,
@@ -146,7 +146,7 @@ def fig_eval_compare():
         ax.set_title(title, pad=6)
         ax.set_xlabel(r"$S$")
         ax.set_ylabel(r"$V$")
-        ax.legend(loc="upper left", fontsize=8.5)
+        ax.legend(loc="upper left", fontsize=26)
         ax.grid(True, alpha=0.15, linewidth=0.5)
         ax.set_xlim(50, 250)
 

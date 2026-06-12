@@ -12,9 +12,9 @@ os.makedirs(OUT, exist_ok=True)
 plt.rcParams.update({
     "font.family":        "serif",
     "font.serif":         ["DejaVu Serif", "Times New Roman", "serif"],
-    "font.size":          11,
-    "axes.titlesize":     13,
-    "axes.labelsize":     11,
+    "font.size":          16.5,
+    "axes.titlesize":     16.5,
+    "axes.labelsize":     16.5,
     "axes.linewidth":     1.0,
     "axes.spines.top":    False,
     "axes.spines.right":  False,
@@ -28,7 +28,7 @@ plt.rcParams.update({
     "ytick.minor.size":   2,
     "legend.framealpha":  0.95,
     "legend.edgecolor":   "#bbbbbb",
-    "legend.fontsize":    9.5,
+    "legend.fontsize":    16.5,
     "legend.handlelength": 2.8,
     "text.usetex":        False,
     "figure.dpi":         150,
@@ -59,19 +59,19 @@ def fig_soft_mask():
 
     ax.annotate(r"$\xi\!\to\!0$: mask $\to 0$" "\n(BSM / CEV)",
                 xy=(0.008, 0.04), xytext=(0.06, 0.18),
-                fontsize=9.5, color=C3,
+                fontsize=16.5, color=C3,
                 arrowprops=dict(arrowstyle="-|>", color=C3, lw=1.0,
                                 connectionstyle="arc3,rad=0.2"))
 
     ax.annotate(r"$\xi\!=\!0.3$: mask $\approx 0.998$" "\n(Heston)",
                 xy=(0.30, 0.998), xytext=(0.32, 0.78),
-                fontsize=9.5, color=C2,
+                fontsize=16.5, color=C2,
                 arrowprops=dict(arrowstyle="-|>", color=C2, lw=1.0,
                                 connectionstyle="arc3,rad=-0.2"))
 
     ax.text(0.22, 0.38,
             r"$\mathrm{mask}=\tanh^2\!\left(\dfrac{\xi}{0.05}\right)$",
-            fontsize=11, color=C1, ha="center",
+            fontsize=16.5, color=C1, ha="center",
             bbox=dict(boxstyle="round,pad=0.4", facecolor="#EEF4FF",
                       edgecolor=C1, alpha=0.9, linewidth=0.8))
 
