@@ -105,18 +105,6 @@
 	\intotoc{\bibname}% add link to contents table and bookmark
 	\bibliography{Biblio/ref}% bibliography
 	%-
-	%-> Appendix
-	%-
-	\cleardoublepage%
-	\appendix% initialize the environment
-	\ctexset{
-		chapter = {
-			name = {附录~},
-			number = \Alph{chapter},
-		}
-	}
-	\input{Tex/Appendix}% appendix content
-	%-
 	%-> Other backmatter
 	%-
 	\backmatter% initialize the environment for acknowledgements etc.
